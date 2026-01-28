@@ -1,0 +1,102 @@
+name: rehab-plan-generator # プロジェクト名（コンテナ名の接頭辞になります）
+
+services: # ここに起動するサーバー群を定義します
+  # ----------------------------------------------------------------
+  # 🐘 Database: PostgreSQL + pgvector
+  # ----------------------------------------------------------------
+  # 医療データの中間DBおよびベクトル検索エンジンとして機能します。
+  db:
+    image: pgvector/pgvector:pg16 # 拡張機能(pgvector)が入ったバージョン
+    container_name: rpg-db
+    restart: always
+    ports:
+      - "5432:5432" # 開発用: ホストからDBクライアントで接続可能にする
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-rehab_db}
+      TZ: Asia/Tokyo
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d # 初期化SQL (pgvector有効化)
+    networks:
+      - rpg-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-rehab_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------
+  # 🐍 Backend: Python (FastAPI)
+  # ----------------------------------------------------------------
+  # APIサーバーおよびビジネスロジックを実行します。
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rpg-backend
+    restart: on-failure
+    ports:
+      - "8000:8000" # 開発用: Swagger UI (http://localhost:8000/docs) に直接アクセス
+    volumes:
+      - ./backend:/app # ホットリロード: ローカルのコード変更を即座に反映
+      - ./logs/app:/var/log/app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-rehab_db}
+      ENV: dev
+    depends_on:
+      db:
+        condition: service_healthy
+    # 開発モード(--reload)で起動
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - rpg-network
+
+  # ----------------------------------------------------------------
+  # ⚛️ Frontend: React + TypeScript (Vite)
+  # ----------------------------------------------------------------
+  # UIを提供します。
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rpg-frontend
+    ports:
+      - "3000:5173" # ホストの3000番をコンテナの5173(Viteデフォルト)に転送
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # コンテナ内のnode_modulesをローカルで上書きしないための設定
+    environment:
+      - CHOKIDAR_USEPOLLING=true # Windows/WSLでのホットリロード検知漏れ防止
+    # ホスト0.0.0.0で起動しないとコンテナ外からアクセスできないため必須
+    command: npm run dev -- --host
+    networks:
+      - rpg-network
+
+  # ----------------------------------------------------------------
+  # 🌐 Nginx: Reverse Proxy
+  # ----------------------------------------------------------------
+  # 本番環境を模倣し、フロントとバックエンドへの振り分けを行います。
+  # CORSエラー回避のため、開発中でもこれ経由でアクセスすることを推奨します。
+  nginx:
+    image: nginx:alpine
+    container_name: rpg-nginx
+    ports:
+      - "80:80" # http://localhost でアクセス可能に
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./frontend/public/libs:/usr/share/nginx/html/libs # オフライン用ライブラリ配信
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - rpg-network
+
+volumes: # データの保存場所定義
+  db_data: # DBデータの永続化
+
+networks: # コンテナ同士の通信網定義
+  rpg-network:
+    driver: bridge

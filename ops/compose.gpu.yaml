@@ -1,0 +1,11 @@
+services:
+  backend:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1 # GPUの数
+              capabilities: [gpu]
+    environment:
+      - USE_GPU=true

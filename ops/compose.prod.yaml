@@ -1,0 +1,25 @@
+services:
+  db:
+    restart: always
+    # 本番ではポートを公開しない（コンテナ間通信のみ）
+    ports: [] 
+
+  backend:
+    restart: always
+    volumes:
+      # ソースコードのマウントを外す（イメージ内のコードを使う）
+      - ./logs/app:/var/log/app
+    # リロードなしで起動
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    # 本番ではビルド済みの静的ファイルだけをNginxで配信するのが一般的ですが、
+    # 簡易構成としてNodeサーバーで動かす場合の設定
+    restart: always
+    command: npm run preview -- --host
+
+  nginx:
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443" # SSL対応用

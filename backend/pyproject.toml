@@ -1,0 +1,26 @@
+[project]
+name = "rehab-plan-generator"
+version = "0.1.0"
+description = "AI-powered Rehabilitation Plan Generator"
+requires-python = ">=3.11,<3.12" 
+# ↑ PyTorch対応のため3.11系に固定
+
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0.31",
+    "asyncpg>=0.29.0",
+    "psycopg2-binary>=2.9.9",
+    "pgvector>=0.3.0",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.3.0",
+    "alembic>=1.13.2",
+    "numpy>=1.26.4",
+    # AI関連 (まだ入れないが準備として)
+    # "torch>=2.3.1", 
+    # "lightgbm>=4.4.0"
+]
+
+[tool.uv]

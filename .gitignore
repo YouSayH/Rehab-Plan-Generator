@@ -1,0 +1,30 @@
+# Environment Variables
+.env
+.venv
+venv/
+__pycache__/
+*.pyc
+
+# Node modules
+node_modules/
+npm-debug.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Data & Models
+backend/ml_engine/models/*.bin
+backend/ml_engine/models/*.pkl
+data/samples/*.csv
+data/samples/*.xlsx
+
+.history
