@@ -10,3 +10,6 @@ pydantic>=2.8.0
 pydantic-settings>=2.3.0
 alembic>=1.13.2
 numpy>=1.26.4
+pytest
+pytest-asyncio
+httpx

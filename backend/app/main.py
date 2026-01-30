@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# 作成したルーターをインポート
+from app.api.v1.endpoints import patients, plans
+
 app = FastAPI(
     title="Rehab Plan Generator API",
     version="0.1.0"
@@ -15,7 +18,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 修正ポイント: パスを "/" ではなく "/api/" に変更、または追加します
+# ----------------------------------------------------------------
+# ルーターの登録 (Router Registration)
+# ----------------------------------------------------------------
+# これにより、patients.py で定義した機能が以下のURLで有効になります
+# - POST: http://localhost:8000/api/v1/patients/
+# - GET : http://localhost:8000/api/v1/patients/
+# ----------------------------------------------------------------
+app.include_router(patients.router, prefix="/api/v1/patients", tags=["patients"])
+app.include_router(plans.router, prefix="/api/v1/plans", tags=["plans"])
+
+# 既存のエンドポイント
 @app.get("/api/")
 def read_root():
     return {"message": "Hello from FastAPI!", "status": "running"}
