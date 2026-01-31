@@ -37,6 +37,12 @@ COPY requirements/ ./requirements/
 # 開発中は dev 依存関係も含めたいので、必要に応じてフラグを調整
 RUN uv pip install --system -r requirements/_base.txt
 
+# クラウド環境(gemini)を使う場合
+RUN uv pip install --system -r requirements/cloud_llm.txt
+
+# ローカル環境(ollama)を使う場合
+RUN uv pip install --system -r requirements/local_gpu.txt
+
 # ※ 本格的な運用では pyproject.toml に依存関係を書き、
 # RUN uv pip install --system -r pyproject.toml とします。
 # 今回は初期セットアップのため、主要ライブラリを直接入れています。
