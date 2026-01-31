@@ -9,12 +9,11 @@ services: # ここに起動するサーバー群を定義します
     image: pgvector/pgvector:pg16 # 拡張機能(pgvector)が入ったバージョン
     container_name: rpg-db
     restart: always
-    ports:
-      - "5432:5432" # 開発用: ホストからDBクライアントで接続可能にする
+    # ポート公開(ports)は削除し、内部ネットワークのみとする
     environment:
-      POSTGRES_USER: ${DB_USER:-user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-      POSTGRES_DB: ${DB_NAME:-rehab_db}
+      POSTGRES_USER: ${DB_USER}     # .envから読み込み
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
       TZ: Asia/Tokyo
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -22,7 +21,7 @@ services: # ここに起動するサーバー群を定義します
     networks:
       - rpg-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-rehab_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,20 +35,18 @@ services: # ここに起動するサーバー群を定義します
       context: ./backend
       dockerfile: Dockerfile
     container_name: rpg-backend
-    restart: on-failure
-    ports:
-      - "8000:8000" # 開発用: Swagger UI (http://localhost:8000/docs) に直接アクセス
+    restart: always
+    # portsとvolumes(ソースコード同期)を削除
     volumes:
-      - ./backend:/app # ホットリロード: ローカルのコード変更を即座に反映
       - ./logs/app:/var/log/app
     environment:
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-user}:${DB_PASSWORD:-password}@db:5432/${DB_NAME:-rehab_db}
-      ENV: dev
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      ENV: ${ENV}
     depends_on:
       db:
         condition: service_healthy
-    # 開発モード(--reload)で起動
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # 本番用コマンド: リロードなし
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     networks:
       - rpg-network
 
@@ -62,28 +59,25 @@ services: # ここに起動するサーバー群を定義します
       context: ./frontend
       dockerfile: Dockerfile
     container_name: rpg-frontend
-    ports:
-      - "3000:5173" # ホストの3000番をコンテナの5173(Viteデフォルト)に転送
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules # コンテナ内のnode_modulesをローカルで上書きしないための設定
+    restart: always
+    # portsを削除
     environment:
-      - CHOKIDAR_USEPOLLING=true # Windows/WSLでのホットリロード検知漏れ防止
-    # ホスト0.0.0.0で起動しないとコンテナ外からアクセスできないため必須
-    command: npm run dev -- --host
+      - NODE_ENV=production
+    # 本番用コマンド (Viteのpreview機能など)
+    command: npm run preview -- --host
     networks:
       - rpg-network
 
   # ----------------------------------------------------------------
   # 🌐 Nginx: Reverse Proxy
   # ----------------------------------------------------------------
-  # 本番環境を模倣し、フロントとバックエンドへの振り分けを行います。
-  # CORSエラー回避のため、開発中でもこれ経由でアクセスすることを推奨します。
+  # 唯一外部(ホスト)と通信するゲートウェイ
   nginx:
     image: nginx:alpine
     container_name: rpg-nginx
     ports:
-      - "80:80" # http://localhost でアクセス可能に
+      - "80:80"
+      # 本番でSSL化する場合はここに "443:443" を追加
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./frontend/public/libs:/usr/share/nginx/html/libs # オフライン用ライブラリ配信

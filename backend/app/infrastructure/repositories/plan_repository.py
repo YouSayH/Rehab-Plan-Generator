@@ -61,23 +61,27 @@ class PlanRepository:
 
     async def update(self, plan_id: int, plan_in: PlanUpdate) -> Optional[PlanDataStore]:
         """
-        計画書の内容（JSONデータ）を更新します。
+        計画書の内容を更新します。
+        変更されたフィールドのみを動的に適用します。
         """
         print(f"[PlanRepository] Updating plan ID: {plan_id}")
         
-        # まず存在確認
+        # 1. 存在確認
         db_plan = await self.get_by_id(plan_id)
         if not db_plan:
             print(f"[PlanRepository] Plan ID {plan_id} not found.")
             return None
 
-        # raw_data を上書き更新
-        # ※ SQLAlchemyのモデル属性への代入で更新検知されます
-        db_plan.raw_data = plan_in.raw_data
+        # 2. 変更差分の適用 (ここを修正！)
+        # exclude_unset=True により、クライアントが送信してきた項目だけを取得
+        update_data = plan_in.model_dump(exclude_unset=True)
         
-        # update_timeなどはDB側(onupdate)で自動更新されるか、必要ならここでセット
-        # db_plan.updated_at = datetime.now() 
+        for field, value in update_data.items():
+            # DBモデルの属性(field)を、新しい値(value)で上書き
+            setattr(db_plan, field, value)
 
+        # 3. 保存
+        self.db.add(db_plan)
         await self.db.commit()
         await self.db.refresh(db_plan)
         

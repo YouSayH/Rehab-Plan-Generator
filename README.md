@@ -14,17 +14,35 @@
 
 Docker Desktop がインストールされている必要があります。
 
+### 1. 開発環境 (Development)
+`compose.override.yaml` が自動的に読み込まれ、ホットリロード有効・ポート開放状態で起動します。
+
   ```bash
   # プロジェクトのクローン（初回のみ）
   git clone <repository-url>
   cd rehab-plan-generator
 
-  # 起動 (ビルド含む)
+  # 開発用起動 (初回や構成変更時は --build を推奨)
   docker compose up --build
+
   ```
 
-* **Frontend:** http://localhost (Nginx経由)
+* **Frontend (App):** http://localhost (Nginx経由)
+    * ※開発用ポート: http://localhost:3000 (React直接)
+
+
 * **Backend API:** http://localhost:8000/docs (Swagger UI)
+
+### 2. 本番環境 / デプロイ (Production)
+
+`compose.override.yaml` を無視し、セキュアな設定（`compose.yaml`のみ）で起動します。
+外部へのポート公開はNginx (80/443) のみに制限され、ソースコードはイメージ内包のものを使用します。
+
+```bash
+# 本番用起動 (オーバーライドファイルを無視して起動)
+docker compose -f compose.yaml up -d --build
+
+```
 
 ## 📁 ディレクトリ構成
   ```Text
@@ -147,7 +165,8 @@ Docker Desktop がインストールされている必要があります。
   ├──.env.example             # 🔐 環境変数のサンプル (Git管理対象)
   ├──.env                     # 🔐 実際の環境変数 (Git除外)
   ├──.gitignore
-  ├──compose.yaml             # 🐳 【メイン】開発用の一発起動設定 (docker compose up)
+  ├──compose.yaml             # 🐳 【共通/本番】ベースとなるDocker設定
+  ├──compose.override.yaml    # 🐳 【開発用】ローカル開発用の差分設定
   ├──CONTRIBUTING.md          # 📜 開発ルール・ガイドライン
   ├──README.md
   └──YOUKENTEIGI.md
@@ -234,7 +253,7 @@ DBeaverやTablePlusなどのGUIツールでデータベースの中身を確認�
 * **User**: `user`
 * **Password**: `password`
 
-※ ポート `5432` は `docker-compose.yaml` でホスト側に公開されています。
+※ ポート `5432` は開発モード（`compose.override.yaml` 適用時）のみ `127.0.0.1` に公開されます。本番起動時は外部から接続できません。
 
 ### 6. よくあるエラーと対処
 
