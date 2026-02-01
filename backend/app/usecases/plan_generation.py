@@ -89,22 +89,22 @@ class PlanGenerationUseCase:
                 # ここでは安全のため中断し、上位にエラーを通知する方針とする。
                 raise RuntimeError(f"Failed to generate plan part '{schema_name}': {e}") from e
 
-        # 4. DBへの保存 (Transaction)
-        # 生成プロセスが完了した後、原子性を保証してDBに保存する
+        # 4. DBへの保存
+        # 生成プロセスが完了した後、DBに保存する
+        # ※ PlanRepository.create 内で commit されるため、ここでは明示的なトランザクションブロックは不要
         try:
-            # トランザクションブロック: このブロックを抜けるときに自動commitされる
-            # エラー時は自動rollbackされる
-            async with self.db.begin():
-                plan_in = PlanCreate(
-                    hash_id=hash_id,
-                    raw_data=generated_plan
-                )
-                created_plan = await self.plan_repo.create(plan_in)
+            plan_in = PlanCreate(
+                hash_id=hash_id,
+                raw_data=generated_plan
+            )
+            created_plan = await self.plan_repo.create(plan_in)
                 
-                # (将来的な拡張) 生成履歴やトークン使用量などのログ保存もここで行う
-
             logger.info(f"Plan generation completed and saved. Plan ID: {created_plan.plan_id}")
             return created_plan
+
+        except Exception as e:
+            logger.error(f"Database save failed: {e}", exc_info=True)
+            raise RuntimeError("Failed to save generated plan to database.") from e
 
         except Exception as e:
             logger.error(f"Database transaction failed: {e}", exc_info=True)
