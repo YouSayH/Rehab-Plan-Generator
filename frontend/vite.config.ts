@@ -17,8 +17,23 @@ export default defineConfig({
       }
     }
   },
-  // Univer用の最適化設定
   optimizeDeps: {
-    exclude: ['@univerjs/presets', '@univerjs/preset-sheets-core']
+    // 1. これらはバンドルする
+    include: ['react-resizable-panels', 'lucide-react'],
+    
+    // 2. Univer系はバンドル「しない」（ここが最重要！）
+    // これにより、Viteがソースコードをそのまま扱うようになり、2重読み込みを防ぎます
+    exclude: [
+      '@univerjs/core',
+      '@univerjs/design',
+      '@univerjs/engine-render',
+      '@univerjs/engine-formula',
+      '@univerjs/ui',
+      '@univerjs/docs',
+      '@univerjs/docs-ui',
+      '@univerjs/sheets',
+      '@univerjs/sheets-ui',
+      '@univerjs/sheets-formula'
+    ]
   }
 })

@@ -10,15 +10,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@univerjs/core": "^0.15.4",
+    "@univerjs/design": "^0.15.4",
+    "@univerjs/docs": "^0.15.4",
+    "@univerjs/docs-ui": "^0.15.4",
+    "@univerjs/engine-formula": "^0.15.4",
+    "@univerjs/engine-render": "^0.15.4",
+    "@univerjs/preset-sheets-core": "^0.15.2",
+    "@univerjs/presets": "^0.15.2",
+    "@univerjs/sheets": "^0.15.4",
+    "@univerjs/sheets-formula": "^0.15.4",
+    "@univerjs/sheets-ui": "^0.15.4",
+    "@univerjs/ui": "^0.15.4",
+    "lucide-react": "^0.563.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@univerjs/presets": "^0.15.2",
-    "@univerjs/preset-sheets-core": "^0.15.2",
-    "@univerjs/core": "^0.15.2",
-    "@univerjs/design": "^0.15.2",
-    "@univerjs/engine-render": "^0.15.2",
-    "@univerjs/engine-formula": "^0.15.2",
-    "@univerjs/ui": "^0.15.2"
+    "react-resizable-panels": "^2.1.9"
   },
   "devDependencies": {
     "@types/react": "^19.0.1",

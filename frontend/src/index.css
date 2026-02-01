@@ -1,0 +1,20 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+/* ここが重要：ブラウザのデフォルト余白を消して、高さを100%にする */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* 画面全体のスクロールを禁止（各パネル内でスクロールさせる） */
+  background-color: #f8f9fa; /* 背景色 */
+}
+
+/* ボックスサイズの計算を直感的にする */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
