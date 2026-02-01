@@ -1,6 +1,6 @@
 from datetime import date
 from typing import Optional, Literal, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 # ==========================================
 # 1. Basic & Header Information
@@ -10,6 +10,23 @@ class BasicInfoSchema(BaseModel):
     name: Optional[str] = Field(None, description="患者氏名")
     age: Optional[int] = Field(None, description="患者の年齢")
     gender: Optional[Literal['男', '女']] = Field(None, description="患者の性別")
+
+    @computed_field
+    @property
+    def age_display(self) -> str:
+        """
+        LLMに提示するための年齢表記を生成する。
+        例: 83 -> "80代前半", None -> "不明"
+        """
+        if self.age is None:
+            return "不明"
+        
+        try:
+            decade = (self.age // 10) * 10
+            half = "前半" if (self.age % 10) < 5 else "後半"
+            return f"{decade}代{half}"
+        except Exception:
+            return "不明"
 
     # Header Dates & Info
     evaluation_date: Optional[date] = Field(None, description="評価日")
@@ -526,7 +543,8 @@ class PatientExtractionSchema(BaseModel):
         # --- 1. Basic ---
         b = self.basic
         flat.update({
-            "name": b.name, "age": b.age, "gender": b.gender,
+            "name": b.name, "age": b.age, 
+            "age_display": b.age_display, "gender": b.gender,
             "header_evaluation_date": b.evaluation_date,
             "header_disease_name_txt": b.disease_name,
             "header_treatment_details_txt": b.treatment_details,

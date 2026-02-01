@@ -30,6 +30,10 @@ class TestSchemaCoverage:
         missing_keys = legacy_keys - new_keys
         extra_keys = new_keys - legacy_keys
 
+        # 新機能として追加したフィールドは、過剰キーチェックから除外する
+        allowed_extras = {"age_display"}
+        extra_keys = extra_keys - allowed_extras
+
         # 4. アサーション (判定)
         
         # 欠落キーがあってはならない

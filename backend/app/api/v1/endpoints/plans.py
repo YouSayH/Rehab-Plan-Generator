@@ -6,6 +6,9 @@ from app.api.dependencies import get_db
 from app.schemas.schemas import PlanCreate, PlanRead, PlanUpdate
 from app.infrastructure.repositories.plan_repository import PlanRepository
 
+from app.schemas.extraction_schemas import PatientExtractionSchema
+from app.usecases.plan_generation import PlanGenerationUseCase
+
 router = APIRouter()
 
 @router.post("/", response_model=PlanRead, status_code=status.HTTP_201_CREATED)
@@ -85,3 +88,35 @@ async def update_plan(
         raise HTTPException(status_code=404, detail="Plan not found")
         
     return updated_plan
+
+
+@router.post("/generate/{hash_id}", response_model=PlanRead)
+async def generate_plan_draft(
+    hash_id: str,
+    patient_data: PatientExtractionSchema,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Frontendから送られた患者データ(Extract済)を元に、AIを使って計画書ドラフトを生成・保存する。
+    """
+    print(f"[API] POST /plans/generate/{hash_id} Request received.")
+
+    # UseCaseの初期化と実行
+    usecase = PlanGenerationUseCase(db)
+    
+    try:
+        # 生成プロセスを実行 (内部でLLM呼び出し -> DB保存まで行う)
+        # 必要であれば body に therapist_notes を含めて渡す設計も可能
+        created_plan = await usecase.execute(
+            hash_id=hash_id, 
+            patient_data=patient_data,
+            therapist_notes="" # 現状は空文字、必要に応じて拡張
+        )
+        return created_plan
+
+    except Exception as e:
+        print(f"[API] Error during plan generation: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to generate plan: {str(e)}"
+        )

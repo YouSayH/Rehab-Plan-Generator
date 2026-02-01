@@ -168,3 +168,17 @@ class TestExtractionSchemas:
             goals=goals or GoalSettingSchema(),
             signature=signature or SignatureSchema()
         )
+    
+    def test_age_display_logic(self):
+        """年齢が正しく年代・前半後半に変換されるか"""
+        # 83歳 -> 80代前半
+        schema1 = self._create_dummy_schema(basic=BasicInfoSchema(age=83))
+        assert schema1.basic.age_display == "80代前半"
+
+        # 78歳 -> 70代後半
+        schema2 = self._create_dummy_schema(basic=BasicInfoSchema(age=78))
+        assert schema2.basic.age_display == "70代後半"
+        
+        # None -> 不明
+        schema3 = self._create_dummy_schema(basic=BasicInfoSchema(age=None))
+        assert schema3.basic.age_display == "不明"
