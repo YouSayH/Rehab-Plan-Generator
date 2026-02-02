@@ -3,25 +3,32 @@ import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/sheets-ui/lib/index.css';
 
-import { Univer, LocaleType, UniverInstanceType } from '@univerjs/core';
+import { Univer, LocaleType, UniverInstanceType, ICommandService } from '@univerjs/core';
 import { defaultTheme } from '@univerjs/design';
 import { UniverDocsPlugin } from '@univerjs/docs';
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
 import { UniverFormulaEnginePlugin } from '@univerjs/engine-formula';
 import { UniverRenderEnginePlugin } from '@univerjs/engine-render';
-import { UniverSheetsPlugin } from '@univerjs/sheets';
+import { UniverSheetsPlugin, SetRangeValuesCommand } from '@univerjs/sheets';
 import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
 import { UniverUIPlugin } from '@univerjs/ui';
 
+// Facade APIが利用可能な場合はこちらを使用 (npm install @univerjs/facade が必要)
+// import { FUniver } from '@univerjs/facade';
+
+import { usePlanContext } from './PlanContext';
+import { CELL_MAPPING } from '../../api/types';
+
 const UniverSheet: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const univerRef = useRef<Univer | null>(null);
+  const { currentPlan } = usePlanContext();
 
+  // 1. Univer初期化
   useEffect(() => {
     if (!containerRef.current || univerRef.current) return;
 
-    // 1. Univer本体の初期化
     const univer = new Univer({
       theme: defaultTheme,
       locale: LocaleType.JA_JP, // 日本語を指定
@@ -61,9 +68,12 @@ const UniverSheet: React.FC = () => {
           id: 'sheet-01',
           name: '様式23',
           cellData: {
-            0: {
-              0: { v: 'リハビリテーション総合実施計画書' },
-            }
+            0: { 0: { v: 'リハビリテーション総合実施計画書' } },
+            // マッピング先のセルにラベルを表示しておくと分かりやすいです
+            11: { 0: { v: '短期目標:' } }, // Row 11 (B12相当の左)
+            13: { 0: { v: '長期目標:' } },
+            15: { 0: { v: 'プログラム:' } },
+            17: { 0: { v: 'リスク管理:' } },
           }
         }
       }
@@ -73,20 +83,55 @@ const UniverSheet: React.FC = () => {
 
     // クリーンアップ処理
     return () => {
-      const univerInstance = univerRef.current;
-      if (univerInstance) {
-        // Reactのレンダリングサイクルと衝突しないよう、破棄処理を次のタイミングに遅らせます
-        setTimeout(() => {
-          try {
-            univerInstance.dispose();
-          } catch (e) {
-            console.warn('Univer cleanup warning:', e);
-          }
-        }, 10); // 10ms待機
+      setTimeout(() => {
+        univerRef.current?.dispose();
         univerRef.current = null;
-      }
+      }, 10);
     };
   }, []);
+
+  // 2. データ反映ロジック (Commandを使用)
+  useEffect(() => {
+    if (!currentPlan || !univerRef.current) return;
+
+    console.log('[Univer] Writing data to sheet...', currentPlan.raw_data);
+
+    // ICommandServiceを取得 (DIコンテナから取得)
+    // ※ Univerの型定義によっては .get() が直接呼べない場合があるため、その場合は any キャストで回避します
+    // @ts-ignore
+    const commandService = univerRef.current.__getInjector().get(ICommandService);
+
+    if (!commandService) {
+      console.error('CommandService not found');
+      return;
+    }
+
+    // 各項目をセルに書き込む
+    Object.keys(CELL_MAPPING).forEach((key) => {
+      const textValue = currentPlan.raw_data[key];
+      
+      if (textValue) {
+        const { r, c } = CELL_MAPPING[key];
+        
+        // SetRangeValuesCommandを実行
+        commandService.executeCommand(SetRangeValuesCommand.id, {
+          unitId: 'workbook-01',
+          subUnitId: 'sheet-01',
+          range: { 
+            startRow: r, 
+            startColumn: c, 
+            endRow: r, 
+            endColumn: c 
+          },
+          value: {
+            v: textValue, // 書き込む値
+            // 必要に応じてスタイルも指定可能 (例: wrapStrategy: 1 で折り返し)
+          },
+        });
+      }
+    });
+
+  }, [currentPlan]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

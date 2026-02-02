@@ -8,6 +8,13 @@
 PATIENT_FIELD_LABELS = {
     # --- 1枚目 ---
     # ヘッダー・基本情報
+    "name": "氏名",
+    "age": "年齢",
+    "age_display": "年齢(年代)",
+    "gender": "性別",
+    "header_evaluation_date": "評価日",
+    "main_contraindications_txt": "禁忌事項・注意事項",
+    "main_risks_txt": "リスク管理・留意点",
     "header_disease_name_txt": "算定病名",
     "header_treatment_details_txt": "治療内容",
     "header_onset_date": "発症日・手術日",
@@ -16,6 +23,7 @@ PATIENT_FIELD_LABELS = {
     "header_therapy_pt_chk": "実施療法(PT)",
     "header_therapy_ot_chk": "実施療法(OT)",
     "header_therapy_st_chk": "実施療法(ST)",
+
     
     # 心身機能・構造 (全般)
     "func_consciousness_disorder_chk": "意識障害",
@@ -29,8 +37,9 @@ PATIENT_FIELD_LABELS = {
     "func_circulatory_ef_chk": "心駆出率(EF)測定",
     "func_circulatory_ef_val": "心駆出率(EF)値",
     "func_circulatory_arrhythmia_chk": "不整脈",
-    # "func_circulatory_arrhythmia_status_slct": "不整脈の状態",
+    "func_circulatory_arrhythmia_status_slct": "不整脈の状態",
     "func_risk_factors_chk": "危険因子",
+    "func_risk_other_txt": "危険因子(その他詳細)",
     "func_risk_hypertension_chk": "高血圧症",
     "func_risk_dyslipidemia_chk": "脂質異常症",
     "func_risk_diabetes_chk": "糖尿病",
@@ -129,6 +138,72 @@ PATIENT_FIELD_LABELS = {
     "func_basic_other_chk": "基本動作(その他)",
     "func_basic_other_txt": "基本動作(その他詳細)",
 
+    # 食事
+    "adl_eating_fim_start_val": "食事(FIM開始時)",
+    "adl_eating_fim_current_val": "食事(FIM現在)",
+    "adl_eating_bi_start_val": "食事(BI開始時)",
+    "adl_eating_bi_current_val": "食事(BI現在)",
+    # 整容
+    "adl_grooming_fim_start_val": "整容(FIM開始時)",
+    "adl_grooming_fim_current_val": "整容(FIM現在)",
+    "adl_grooming_bi_start_val": "整容(BI開始時)",
+    "adl_grooming_bi_current_val": "整容(BI現在)",
+    # 入浴
+    "adl_bathing_fim_start_val": "入浴(FIM開始時)",
+    "adl_bathing_fim_current_val": "入浴(FIM現在)",
+    "adl_bathing_bi_start_val": "入浴(BI開始時)",
+    "adl_bathing_bi_current_val": "入浴(BI現在)",
+    # 更衣 (FIMは上下、BIはまとめて管理されることが多いがここでは個別定義)
+    "adl_dressing_upper_fim_start_val": "更衣・上(FIM開始時)",
+    "adl_dressing_upper_fim_current_val": "更衣・上(FIM現在)",
+    "adl_dressing_lower_fim_start_val": "更衣・下(FIM開始時)",
+    "adl_dressing_lower_fim_current_val": "更衣・下(FIM現在)",
+    "adl_dressing_bi_start_val": "更衣(BI開始時)",
+    "adl_dressing_bi_current_val": "更衣(BI現在)",
+    # 排泄
+    "adl_toileting_fim_start_val": "トイレ動作(FIM開始時)",
+    "adl_toileting_fim_current_val": "トイレ動作(FIM現在)",
+    "adl_toileting_bi_start_val": "トイレ動作(BI開始時)",
+    "adl_toileting_bi_current_val": "トイレ動作(BI現在)",
+    # 排泄コントロール
+    "adl_bladder_management_fim_start_val": "排尿管理(FIM開始時)",
+    "adl_bladder_management_fim_current_val": "排尿管理(FIM現在)",
+    "adl_bladder_management_bi_start_val": "排尿管理(BI開始時)",
+    "adl_bladder_management_bi_current_val": "排尿管理(BI現在)",
+    "adl_bowel_management_fim_start_val": "排便管理(FIM開始時)",
+    "adl_bowel_management_fim_current_val": "排便管理(FIM現在)",
+    "adl_bowel_management_bi_start_val": "排便管理(BI開始時)",
+    "adl_bowel_management_bi_current_val": "排便管理(BI現在)",
+    # 移乗
+    "adl_transfer_bed_chair_wc_fim_start_val": "移乗:ベッド(FIM開始時)",
+    "adl_transfer_bed_chair_wc_fim_current_val": "移乗:ベッド(FIM現在)",
+    "adl_transfer_toilet_fim_start_val": "移乗:トイレ(FIM開始時)",
+    "adl_transfer_toilet_fim_current_val": "移乗:トイレ(FIM現在)",
+    "adl_transfer_tub_shower_fim_start_val": "移乗:浴槽(FIM開始時)",
+    "adl_transfer_tub_shower_fim_current_val": "移乗:浴槽(FIM現在)",
+    "adl_transfer_bi_start_val": "移乗(BI開始時)",
+    "adl_transfer_bi_current_val": "移乗(BI現在)",
+    # 移動
+    "adl_locomotion_walk_walkingAids_wc_fim_start_val": "移動:歩行/車椅子(FIM開始時)",
+    "adl_locomotion_walk_walkingAids_wc_fim_current_val": "移動:歩行/車椅子(FIM現在)",
+    "adl_locomotion_walk_walkingAids_wc_bi_start_val": "移動(BI開始時)",
+    "adl_locomotion_walk_walkingAids_wc_bi_current_val": "移動(BI現在)",
+    "adl_locomotion_stairs_fim_start_val": "移動:階段(FIM開始時)",
+    "adl_locomotion_stairs_fim_current_val": "移動:階段(FIM現在)",
+    "adl_locomotion_stairs_bi_start_val": "移動:階段(BI開始時)",
+    "adl_locomotion_stairs_bi_current_val": "移動:階段(BI現在)",
+    # 認知FIM
+    "adl_comprehension_fim_start_val": "理解(FIM開始時)",
+    "adl_comprehension_fim_current_val": "理解(FIM現在)",
+    "adl_expression_fim_start_val": "表出(FIM開始時)",
+    "adl_expression_fim_current_val": "表出(FIM現在)",
+    "adl_social_interaction_fim_start_val": "社会的交流(FIM開始時)",
+    "adl_social_interaction_fim_current_val": "社会的交流(FIM現在)",
+    "adl_problem_solving_fim_start_val": "問題解決(FIM開始時)",
+    "adl_problem_solving_fim_current_val": "問題解決(FIM現在)",
+    "adl_memory_fim_start_val": "記憶(FIM開始時)",
+    "adl_memory_fim_current_val": "記憶(FIM現在)",
+
     # 栄養
     "nutrition_height_chk": "身長測定",
     "nutrition_height_val": "身長(cm)",
@@ -159,6 +234,29 @@ PATIENT_FIELD_LABELS = {
     "nutrition_total_intake_energy_val": "総摂取熱量(kcal)",
     "nutrition_total_intake_protein_val": "総摂取タンパク質量(g)",
 
+
+    # 栄養・目標詳細
+    "nutrition_status_assessment_slct": "栄養状態評価(選択)",
+    "nutrition_swallowing_diet_slct": "嚥下調整食(選択)",
+    "goals_planned_hospitalization_period_chk": "入院予定期間(設定あり)",
+    "goals_planned_hospitalization_period_txt": "入院予定期間",
+    "goals_discharge_destination_chk": "退院先(設定あり)",
+    "goals_discharge_destination_txt": "退院先",
+    "goals_long_term_care_needed_chk": "介護サービスの必要性",
+    "policy_treatment_txt": "治療方針",
+    "goal_p_residence_slct": "目標:住居(選択)",
+    "goal_p_return_to_work_status_slct": "目標:復職(選択)",
+    # 計画書生成項目（出力用）
+    "goals_1_month_txt": "短期目標",
+    "goals_at_discharge_txt": "長期目標（退院時）",
+    "goal_a_action_plan_txt": "活動目標の具体策",
+    "goal_p_action_plan_txt": "参加目標の具体策",
+    "goal_s_env_action_plan_txt": "環境因子の具体策",
+    "goal_s_psychological_action_plan_txt": "心理的支援の具体策",
+    "goal_s_3rd_party_action_plan_txt": "他者支援の具体策",
+    "policy_content_txt": "リハビリテーション実施計画",
+
+
     # 社会保障サービス
     "social_care_level_status_chk": "介護保険",
     "social_care_level_applying_chk": "介護保険(申請中)",
@@ -182,6 +280,20 @@ PATIENT_FIELD_LABELS = {
     "social_disability_certificate_intellectual_grade_txt": "療育手帳(障害程度)",
     "social_disability_certificate_other_chk": "社会保障(その他)",
     "social_disability_certificate_other_txt": "社会保障(その他詳細)",
+
+    # 追加箇所: 署名欄
+    "signature_primary_doctor_txt": "主治医署名",
+    "signature_rehab_doctor_txt": "リハ医署名",
+    "signature_pt_txt": "PT署名",
+    "signature_ot_txt": "OT署名",
+    "signature_st_txt": "ST署名",
+    "signature_nurse_txt": "看護師署名",
+    "signature_dietitian_txt": "管理栄養士署名",
+    "signature_social_worker_txt": "MSW署名",
+    "signature_explained_to_txt": "説明相手",
+    "signature_explanation_date": "説明日",
+    "signature_explainer_txt": "説明者",
+
 
     # --- 2枚目 ---
     # 目標: 参加

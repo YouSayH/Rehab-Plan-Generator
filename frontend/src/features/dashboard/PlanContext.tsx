@@ -1,27 +1,21 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { PlanRead } from '../../api/types';
 
 interface PlanContextType {
-  selectedPatientId: string | null;
-  setSelectedPatientId: (id: string | null) => void;
-  isRightPanelOpen: boolean;
-  toggleRightPanel: () => void;
+  currentPlan: PlanRead | null;
+  setCurrentPlan: (plan: PlanRead) => void;
+  isGenerating: boolean;
+  setIsGenerating: (state: boolean) => void;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
 
 export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
-
-  const toggleRightPanel = () => setIsRightPanelOpen(prev => !prev);
+  const [currentPlan, setCurrentPlan] = useState<PlanRead | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   return (
-    <PlanContext.Provider value={{
-      selectedPatientId,
-      setSelectedPatientId,
-      isRightPanelOpen,
-      toggleRightPanel
-    }}>
+    <PlanContext.Provider value={{ currentPlan, setCurrentPlan, isGenerating, setIsGenerating }}>
       {children}
     </PlanContext.Provider>
   );
@@ -29,7 +23,7 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const usePlanContext = () => {
   const context = useContext(PlanContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('usePlanContext must be used within a PlanProvider');
   }
   return context;
