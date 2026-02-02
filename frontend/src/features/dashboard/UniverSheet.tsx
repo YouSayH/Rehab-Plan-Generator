@@ -83,10 +83,11 @@ const UniverSheet: React.FC = () => {
 
     // クリーンアップ処理
     return () => {
-      setTimeout(() => {
-        univerRef.current?.dispose();
+      if (univerRef.current) {
+        // setTimeoutを使わず、コンポーネント破棄時に即座にリソースを開放
+        univerRef.current.dispose();
         univerRef.current = null;
-      }, 10);
+      }
     };
   }, []);
 
