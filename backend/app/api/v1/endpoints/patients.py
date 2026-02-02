@@ -4,6 +4,7 @@ from typing import List
 
 from app.api.dependencies import get_db
 from app.schemas.schemas import PatientCreate, PatientRead
+from app.schemas.extraction_schemas import PatientExtractionSchema
 from app.infrastructure.repositories.patient_repository import PatientRepository
 
 # Routerの定義
@@ -73,3 +74,27 @@ async def read_patient(
         )
         
     return patient
+
+@router.get("/{hash_id}/latest-state", response_model=PatientExtractionSchema)
+async def read_patient_latest_state(
+    hash_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    患者の最新の状態（構造化データ）を取得します。
+    Frontendの左ペイン表示用です。
+    """
+    print(f"[API] GET /patients/{hash_id}/latest-state Request received.")
+    
+    repo = PatientRepository(db)
+    # リポジトリに追加した get_latest_state を呼び出す
+    state_data = await repo.get_latest_state(hash_id)
+    
+    if not state_data:
+        print(f"[API] Latest state not found for {hash_id}")
+        raise HTTPException(
+            status_code=404,
+            detail="Latest state data not found for this patient."
+        )
+        
+    return state_data

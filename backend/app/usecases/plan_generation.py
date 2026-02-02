@@ -75,6 +75,7 @@ class PlanGenerationUseCase:
                     patient_facts_str=facts_str,
                     generated_plan_so_far=generated_plan
                 )
+                logger.info(f"\n{'='*20} PROMPT FOR {schema_name} {'='*20}\n{prompt}\n{'='*60}")
 
                 # LLM実行 (Structured Output)
                 # 指定したPydanticスキーマに準拠したJSONが返される

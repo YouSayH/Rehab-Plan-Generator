@@ -1,28 +1,70 @@
 // frontend/src/api/types.ts
 
-// Backendの抽出スキーマに対応する型定義
+// ==========================================
+// Patient Extraction Data Types
+// ==========================================
 
 export interface BasicInfo {
-  name?: string;
-  age?: number;
-  gender?: '男' | '女'; // Literalに合わせる
-  disease_name?: string; // disease_name
-  onset_date?: string;
-  history?: string; // 任意フィールド
+  name: string | null;
+  age: number | null;
+  gender: '男' | '女' | null;
+  age_display?: string;
+  disease_name?: string | null;
+  onset_date?: string | null;
+  history?: string | null;
 }
 
-// 複雑なサブスキーマは一旦 Record<string, any> で許容しつつ、主要な構造を定義
+// ADLの各項目（FIM/BI）
+export interface AdlItem {
+  fim_start?: number | null;
+  fim_current?: number | null;
+  bi_start?: number | null;
+  bi_current?: number | null;
+}
+
+// ADL全体
+export interface Adl {
+  eating: AdlItem;
+  grooming: AdlItem;
+  bathing: AdlItem;
+  dressing_upper: AdlItem;
+  dressing_lower: AdlItem;
+  toileting: AdlItem;
+  bladder: AdlItem;
+  bowel: AdlItem;
+  transfer_bed: AdlItem;
+  transfer_toilet: AdlItem;
+  transfer_tub: AdlItem;
+  locomotion_walk: AdlItem;
+  locomotion_stairs: AdlItem;
+  comprehension: AdlItem;
+  expression: AdlItem;
+  social: AdlItem;
+  problem_solving: AdlItem;
+  memory: AdlItem;
+}
+
+export interface Goals {
+  short_term_goal?: string | null;
+  long_term_goal?: string | null;
+}
+
+// データ全体のルート型
 export interface PatientExtractionData {
   basic: BasicInfo;
   medical: Record<string, any>;
   function: Record<string, any>;
   basic_movement: Record<string, any>;
-  adl: Record<string, any>;
+  adl: Adl; // 詳細型を適用
   nutrition: Record<string, any>;
   social: Record<string, any>;
-  goals: Record<string, any>;
+  goals: Goals;
   signature: Record<string, any>;
 }
+
+// ==========================================
+// Plan / Mapping Types
+// ==========================================
 
 export interface PlanRead {
   plan_id: number;
@@ -33,14 +75,14 @@ export interface PlanRead {
   created_at: string;
 }
 
-// セルマッピング定義
-export const CELL_MAPPING: Record<string, { r: number; c: number }> = {
-  // 短期目標
+export interface CellMapping {
+  r: number;
+  c: number;
+}
+
+export const CELL_MAPPING: Record<string, CellMapping> = {
   goals_1_month_txt: { r: 11, c: 1 }, 
-  // 長期目標
   goals_at_discharge_txt: { r: 13, c: 1 }, 
-  // リハビリプログラム (方針 or 具体的内容)
   policy_content_txt: { r: 15, c: 1 }, 
-  // リスク管理
   main_risks_txt: { r: 17, c: 1 }, 
 };

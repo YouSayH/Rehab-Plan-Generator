@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.infrastructure.db.models import PatientsView
+from app.infrastructure.db.models import PatientsView, DocumentsView
 from app.schemas.schemas import PatientCreate
 
 class PatientRepository:
@@ -67,3 +67,24 @@ class PatientRepository:
         
         print(f"[PatientRepository] Retrieved {len(patients)} patients.")
         return patients
+    
+
+    async def get_latest_state(self, hash_id: str) -> dict | None:
+        """
+        指定された患者の最新の状態（doc_type='latest_state'）のentitiesデータを取得する。
+        """
+        print(f"[PatientRepository] Fetching latest state for: {hash_id}")
+        
+        query = select(DocumentsView).where(
+            (DocumentsView.hash_id == hash_id) & 
+            (DocumentsView.doc_type == "latest_state")
+        )
+        result = await self.db.execute(query)
+        doc = result.scalars().first()
+        
+        if doc and doc.entities:
+            print(f"[PatientRepository] Latest state found for {hash_id}")
+            return doc.entities
+        
+        print(f"[PatientRepository] No latest state found for {hash_id}")
+        return None

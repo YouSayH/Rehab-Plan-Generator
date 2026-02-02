@@ -1,56 +1,29 @@
-// frontend/src/features/dashboard/RightPanel.tsx
 import React from 'react';
 import { Sparkles, MessageSquare, Play, Edit3, Loader2 } from 'lucide-react';
 import { usePlanContext } from './PlanContext';
 import { ApiClient } from '../../api/client';
-import { PatientExtractionData } from '../../api/types';
 
 const RightPanel: React.FC = () => {
-  const { setCurrentPlan, isGenerating, setIsGenerating } = usePlanContext();
-
-  // Backendの PatientExtractionSchema (Pydantic) に準拠した構造にする
-  const DUMMY_PATIENT: PatientExtractionData = {
-  basic: {
-      age: 82,
-      gender: '男',
-      disease_name: '脳梗塞 (右片麻痺)', 
-      onset_date: '2026-04-01',
-    },
-    medical: {
-      comorbidities: '高血圧症',
-      risks: '転倒リスクあり',
-    },
-    function: {
-      paralysis: true,
-      jcs_gcs: 'I-1',
-    },
-    basic_movement: {
-      rolling_level: 'independent',
-    },
-    adl: {
-      // ADLスキーマはネストが深いので、必須フィールドがない場合は空オブジェクトでも通る場合が多いですが
-      // エラーが出る場合はここに中身を追加します
-      eating: { fim_current: 5 },
-      transfer_bed: { fim_current: 4 },
-      toileting: { fim_current: 4 },
-    },
-    nutrition: {},
-    social: {},
-    goals: {
-      short_term_goal: 'トイレ動作の見守りレベル',
-      long_term_goal: '自宅復帰',
-    },
-    signature: {}
-  };
+  // Contextから patientData (左ペインのデータ) を取得
+  const { setCurrentPlan, isGenerating, setIsGenerating, patientData } = usePlanContext();
 
   const handleGenerate = async (cardTitle: string) => {
+    if (!patientData) {
+      alert('患者データが読み込まれていません。左パネルを確認してください。');
+      return;
+    }
+
     setIsGenerating(true);
     try {
+      console.log('Generating plan with data:', patientData);
+      
       // API呼び出し
-      const newPlan = await ApiClient.generatePlan('patient_001', DUMMY_PATIENT);
+      // 左ペインで編集された最新の patientData を送信します
+      // ※ IDは現状 'patient_001' 固定としていますが、将来的に動的にします
+      const newPlan = await ApiClient.generatePlan('patient_001', patientData);
       
       setCurrentPlan(newPlan);
-      alert(`「${cardTitle}」の生成が完了しました！`);
+      // alert(`「${cardTitle}」の生成が完了しました！`); // 毎回出ると邪魔なのでコメントアウト推奨
     } catch (error) {
       console.error('Generation failed:', error);
       alert('生成に失敗しました。コンソールログを確認してください。');
@@ -72,7 +45,7 @@ const RightPanel: React.FC = () => {
           <Sparkles size={20} /> AI Co-Editor
         </h2>
         <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-          各カードを実行して計画書を作成します
+          左側のデータを元に計画書を作成します
         </p>
       </div>
 
@@ -103,7 +76,7 @@ const RightPanel: React.FC = () => {
             <div style={{ display: 'flex', gap: '8px' }}>
               <button 
                 onClick={() => handleGenerate(card.title)}
-                disabled={isGenerating || card.status !== 'ready'}
+                disabled={isGenerating || card.status !== 'ready' || !patientData}
                 style={{ 
                   flex: 1, 
                   display: 'flex', 
@@ -111,11 +84,11 @@ const RightPanel: React.FC = () => {
                   justifyContent: 'center', 
                   gap: '4px',
                   padding: '8px', 
-                  backgroundColor: isGenerating ? '#a5b4fc' : '#4f46e5', 
+                  backgroundColor: (isGenerating || !patientData) ? '#a5b4fc' : '#4f46e5', 
                   color: 'white', 
                   border: 'none', 
                   borderRadius: '6px',
-                  cursor: isGenerating || card.status !== 'ready' ? 'not-allowed' : 'pointer',
+                  cursor: (isGenerating || !patientData) ? 'not-allowed' : 'pointer',
                   fontSize: '0.85rem'
                 }}
               >
