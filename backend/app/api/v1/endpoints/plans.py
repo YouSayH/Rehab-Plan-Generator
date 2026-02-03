@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.api.dependencies import get_db
-from app.schemas.schemas import PlanCreate, PlanRead, PlanUpdate
+from app.schemas.schemas import PlanCreate, PlanRead, PlanUpdate, PlanCustomGenerate
 from app.infrastructure.repositories.plan_repository import PlanRepository
 
 from app.schemas.extraction_schemas import PatientExtractionSchema
@@ -89,6 +89,31 @@ async def update_plan(
         
     return updated_plan
 
+
+@router.post("/generate/custom", response_model=dict)
+async def generate_custom_part(
+    request: PlanCustomGenerate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    カスタムプロンプトに基づいて部分的なテキスト生成を行います。
+    結果はJSONで {"result": "生成されたテキスト"} として返します。
+    """
+    print(f"[API] POST /plans/generate/custom Request received.")
+    
+    usecase = PlanGenerationUseCase(db)
+    try:
+        result_text = await usecase.execute_custom(
+            patient_data=request.patient_data,
+            prompt=request.prompt
+        )
+        return {"result": result_text}
+    except Exception as e:
+        print(f"[API] Error during custom generation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate content: {str(e)}"
+        )
 
 @router.post("/generate/{hash_id}", response_model=PlanRead)
 async def generate_plan_draft(

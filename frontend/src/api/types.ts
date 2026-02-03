@@ -55,7 +55,7 @@ export interface PatientExtractionData {
   medical: Record<string, any>;
   function: Record<string, any>;
   basic_movement: Record<string, any>;
-  adl: Adl; // 詳細型を適用
+  adl: Adl;
   nutrition: Record<string, any>;
   social: Record<string, any>;
   goals: Goals;
@@ -76,13 +76,60 @@ export interface PlanRead {
 }
 
 export interface CellMapping {
-  r: number;
-  c: number;
+  r: number; // 0-based index
+  c: number; // 0-based index
 }
 
+// デフォルトのマッピング設定
 export const CELL_MAPPING: Record<string, CellMapping> = {
+  main_risks_txt: { r: 17, c: 1 }, // B18
   goals_1_month_txt: { r: 11, c: 1 }, 
   goals_at_discharge_txt: { r: 13, c: 1 }, 
   policy_content_txt: { r: 15, c: 1 }, 
-  main_risks_txt: { r: 17, c: 1 }, 
+};
+
+// ==========================================
+// Card Configuration Types
+// ==========================================
+
+export interface CardConfig {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  targetKey: string;      // raw_dataのキー (例: main_risks_txt)
+  targetCell?: string;    // ユーザー入力用のセル番号 (例: "B12")
+}
+
+// ユーティリティ: A1形式 ("B12") を {r, c} に変換
+export const parseCellAddress = (address: string): CellMapping | null => {
+  const match = address.toUpperCase().match(/^([A-Z]+)([0-9]+)$/);
+  if (!match) return null;
+
+  const colStr = match[1];
+  const rowStr = match[2];
+
+  // 列変換 (A->0, B->1, AA->26)
+  let col = 0;
+  for (let i = 0; i < colStr.length; i++) {
+    col = col * 26 + (colStr.charCodeAt(i) - 64);
+  }
+  col -= 1; // 0-based
+
+  // 行変換 (1->0)
+  const row = parseInt(rowStr, 10) - 1;
+
+  return { r: row, c: col };
+};
+
+// ユーティリティ: {r, c} を A1形式に変換
+export const stringifyCellAddress = (mapping: CellMapping): string => {
+  let col = mapping.c + 1;
+  let colStr = '';
+  while (col > 0) {
+    const remainder = (col - 1) % 26;
+    colStr = String.fromCharCode(65 + remainder) + colStr;
+    col = Math.floor((col - 1) / 26);
+  }
+  return `${colStr}${mapping.r + 1}`;
 };

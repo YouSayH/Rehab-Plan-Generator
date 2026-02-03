@@ -107,6 +107,42 @@ class PlanGenerationUseCase:
             logger.error(f"Database save failed: {e}", exc_info=True)
             raise RuntimeError("Failed to save generated plan to database.") from e
 
-        except Exception as e:
-            logger.error(f"Database transaction failed: {e}", exc_info=True)
-            raise RuntimeError("Failed to save generated plan to database.") from e
+    async def execute_custom(
+        self,
+        patient_data: Dict[str, Any],
+        prompt: str
+    ) -> str:
+        """
+        カスタムプロンプトによる部分生成を実行します。
+        
+        Args:
+            patient_data (Dict): 患者データ（辞書形式）
+            prompt (str): ユーザー定義のプロンプト
+
+        Returns:
+            str: 生成されたテキスト
+        """
+        # 簡易的に事実情報を構築（Validationなしでdictをそのまま使用する簡易版）
+        # 注意: export_to_mapping_formatを通していないため、patient_dataの構造に依存します。
+        # 本格運用時はPatientExtractionSchemaでバリデーションしてから変換推奨。
+        
+        facts_str = json.dumps(patient_data, ensure_ascii=False, indent=2)
+        
+        full_prompt = f"""
+あなたはリハビリテーション計画書の作成支援AIです。
+以下の患者データを参照し、ユーザーの指示に従って計画書の一部を作成してください。
+
+【患者データ】
+{facts_str}
+
+【指示】
+{prompt}
+
+出力は指示された内容のみをテキストで返してください。余計な挨拶は不要です。
+"""
+        logger.info(f"Executing Custom Generation Prompt: {prompt[:50]}...")
+        
+        # テキスト生成としてLLMを呼び出し
+        response_text = await self.llm_client.generate_text(full_prompt)
+        
+        return response_text

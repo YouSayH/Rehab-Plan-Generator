@@ -79,3 +79,12 @@ class SearchResult(BaseModel):
     score: float
     summary: str
     tags: Dict[str, Any]
+
+# ----------------------------------------------------------------
+# 5. カスタム生成用 (Custom Generation)
+# ----------------------------------------------------------------
+class PlanCustomGenerate(BaseModel):
+    # 循環参照を避けるため、厳密なPatientExtractionSchemaではなくDictで受け取る
+    patient_data: Dict[str, Any]
+    prompt: str
+    target_key: Optional[str] = None

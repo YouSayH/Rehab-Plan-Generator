@@ -3,7 +3,7 @@ import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/sheets-ui/lib/index.css';
 
-import { Univer, LocaleType, UniverInstanceType, ICommandService } from '@univerjs/core';
+import { Univer, LocaleType, UniverInstanceType, ICommandService, WrapStrategy } from '@univerjs/core';
 import { defaultTheme } from '@univerjs/design';
 import { UniverDocsPlugin } from '@univerjs/docs';
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
@@ -18,12 +18,15 @@ import { UniverUIPlugin } from '@univerjs/ui';
 // import { FUniver } from '@univerjs/facade';
 
 import { usePlanContext } from './PlanContext';
-import { CELL_MAPPING } from '../../api/types';
+// ユーティリティと型定義を追加インポート
+import { CELL_MAPPING, parseCellAddress, CellMapping } from '../../api/types';
 
 const UniverSheet: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const univerRef = useRef<Univer | null>(null);
-  const { currentPlan } = usePlanContext();
+  
+  // Contextから currentPlan と cards (ユーザー定義設定) を取得
+  const { currentPlan, cards } = usePlanContext();
 
   // 1. Univer初期化
   useEffect(() => {
@@ -69,8 +72,8 @@ const UniverSheet: React.FC = () => {
           name: '様式23',
           cellData: {
             0: { 0: { v: 'リハビリテーション総合実施計画書' } },
-            // マッピング先のセルにラベルを表示しておくと分かりやすいです
-            11: { 0: { v: '短期目標:' } }, // Row 11 (B12相当の左)
+            // 必要に応じて初期ラベルなどを配置
+            11: { 0: { v: '短期目標:' } },
             13: { 0: { v: '長期目標:' } },
             15: { 0: { v: 'プログラム:' } },
             17: { 0: { v: 'リスク管理:' } },
@@ -81,7 +84,7 @@ const UniverSheet: React.FC = () => {
 
     univerRef.current = univer;
 
-    // クリーンアップ処理
+    // クリーンアップ
     return () => {
       if (univerRef.current) {
         // setTimeoutを使わず、コンポーネント破棄時に即座にリソースを開放
@@ -91,48 +94,65 @@ const UniverSheet: React.FC = () => {
     };
   }, []);
 
-  // 2. データ反映ロジック (Commandを使用)
+  // 2. データ反映ロジック (動的マッピング対応)
   useEffect(() => {
     if (!currentPlan || !univerRef.current) return;
 
-    console.log('[Univer] Writing data to sheet...', currentPlan.raw_data);
+    console.log('[Univer] Updating sheet with plan data...');
 
-    // ICommandServiceを取得 (DIコンテナから取得)
+    // ICommandServiceを取得
     // ※ Univerの型定義によっては .get() が直接呼べない場合があるため、その場合は any キャストで回避します
     // @ts-ignore
     const commandService = univerRef.current.__getInjector().get(ICommandService);
+    if (!commandService) return;
 
-    if (!commandService) {
-      console.error('CommandService not found');
-      return;
-    }
+    // 現在生成されているデータのキー一覧を取得
+    const dataKeys = Object.keys(currentPlan.raw_data);
 
-    // 各項目をセルに書き込む
-    Object.keys(CELL_MAPPING).forEach((key) => {
+    dataKeys.forEach((key) => {
       const textValue = currentPlan.raw_data[key];
+      // 値がない場合はスキップ
+      if (textValue === undefined || textValue === null) return;
+
+      // 書き込み先の座標を決定する変数
+      let mapping: CellMapping | null = null;
+
+      // 【優先順位 1】 カード設定 (ユーザー定義)
+      // そのデータのキー(targetKey)を持つカードを探す
+      const matchingCard = cards.find(c => c.targetKey === key);
       
-      if (textValue) {
-        const { r, c } = CELL_MAPPING[key];
+      // カードが見つかり、かつ有効なセル指定("A1"など)がある場合
+      if (matchingCard && matchingCard.targetCell) {
+        mapping = parseCellAddress(matchingCard.targetCell);
+      }
+
+      // 【優先順位 2】 デフォルトマッピング (types.ts)
+      // カード設定がない、またはセル指定が無効だった場合のフォールバック
+      if (!mapping && CELL_MAPPING[key]) {
+        mapping = CELL_MAPPING[key];
+      }
+
+      // マッピングが確定できれば書き込む
+      if (mapping) {
+        const { r, c } = mapping;
         
-        // SetRangeValuesCommandを実行
         commandService.executeCommand(SetRangeValuesCommand.id, {
           unitId: 'workbook-01',
           subUnitId: 'sheet-01',
-          range: { 
-            startRow: r, 
-            startColumn: c, 
-            endRow: r, 
-            endColumn: c 
-          },
-          value: {
-            v: textValue, // 書き込む値
-            // 必要に応じてスタイルも指定可能 (例: wrapStrategy: 1 で折り返し)
-          },
+          range: { startRow: r, startColumn: c, endRow: r, endColumn: c },
+          value: { 
+            v: textValue,
+            // 長文用に折り返し設定などを入れる場合はここに追加
+            // s: {
+            //   tb: WrapStrategy.WRAP, // tb = Text Wrap (折り返し)
+            //   // vt: 1, // (任意) 垂直方向の配置: 1=Middle, 0=Top, 2=Bottom
+            // }
+           },
         });
       }
     });
 
-  }, [currentPlan]);
+  }, [currentPlan, cards]); // cardsの変更も監視し、設定が変われば即再描画
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
