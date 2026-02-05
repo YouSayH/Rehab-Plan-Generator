@@ -4,18 +4,32 @@ import { ApiClient } from '../../api/client';
 import { AdlItem } from '../../api/types';
 
 const LeftPanel: React.FC = () => {
-  const { patientData, setPatientData } = usePlanContext();
+  const { patientData, setPatientData, registerPatientName } = usePlanContext();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      // 既にデータがある場合は再取得しない（必要に応じて変更）
       if (patientData) return;
       
       setIsLoading(true);
       try {
-        const data = await ApiClient.getLatestState('patient_001');
+        // TODO: 本来はURLパラメータ等からIDを取得すべきだが、現在は固定
+        const currentHashId = 'patient_001';
+
+        const data = await ApiClient.getLatestState(currentHashId);
         setPatientData(data);
+
+        // =================================================================
+        // [Privacy Protection] 実名の登録
+        // 取得したデータに含まれる実名を、ハッシュIDと紐付けてブラウザに保存する。
+        // これにより、生成後の計画書(実名なし)を表示する際に名前を復元できる。
+        // =================================================================
+        if (data.basic && data.basic.name) {
+          registerPatientName(currentHashId, data.basic.name);
+        }
+
       } catch (err) {
         console.error(err);
         setError('患者データの取得に失敗しました');
@@ -25,7 +39,7 @@ const LeftPanel: React.FC = () => {
     };
 
     fetchData();
-  }, [patientData, setPatientData]);
+  }, [patientData, setPatientData, registerPatientName]);
 
   const handleFimChange = (
     category: 'adl', 
@@ -51,7 +65,6 @@ const LeftPanel: React.FC = () => {
   if (!patientData) return <div style={{ padding: 20 }}>データがありません</div>;
 
   // ADL項目の日本語ラベル定義
-  // ※ ここに定義されたキー順に表示されます
   const labelMap: Record<string, string> = {
     eating: '食事',
     grooming: '整容',
@@ -83,7 +96,7 @@ const LeftPanel: React.FC = () => {
         <p style={{ margin: '4px 0' }}><strong>年齢:</strong> {patientData.basic.age}歳 ({patientData.basic.gender})</p>
         <p style={{ margin: '4px 0' }}><strong>疾患:</strong> {patientData.basic.disease_name}</p>
         <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#64748b', background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px' }}>
-           💡 数値を変更して「生成」を押すと、結果に反映されます
+            💡 数値を変更して「生成」を押すと、結果に反映されます
         </div>
       </div>
 
@@ -92,12 +105,9 @@ const LeftPanel: React.FC = () => {
         ADL評価 (FIM現在値)
       </h4>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {/* 修正点: Object.entries(patientData.adl) ではなく labelMap のキーでループする */}
         {Object.entries(labelMap).map(([key, label]) => {
-          // 動的にアクセス
           const item = (patientData.adl as any)[key];
           
-          // データが存在しない、またはオブジェクトでない（equipment_detail等）場合はスキップ
           if (!item || typeof item !== 'object') return null;
 
           const adlItem = item as AdlItem;

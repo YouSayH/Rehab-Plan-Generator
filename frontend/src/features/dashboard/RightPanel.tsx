@@ -245,7 +245,8 @@ const RightPanel: React.FC = () => {
   const { 
     currentPlan, setCurrentPlan, patientData, 
     planStructure, setPlanStructure, 
-    resetPlanStructure, saveStructureToStorage 
+    resetPlanStructure, saveStructureToStorage,
+    getPatientName
   } = usePlanContext();
   
   // 同時生成のためにSetでIDを管理
@@ -254,6 +255,15 @@ const RightPanel: React.FC = () => {
   // 最新のPlanデータを常に保持するためのRef (非同期処理中のデータ競合回避用)
   const currentPlanRef = useRef(currentPlan);
   useEffect(() => { currentPlanRef.current = currentPlan; }, [currentPlan]);
+
+  // 表示名の解決（ハッシュID -> 実名）
+  const displayName = useMemo(() => {
+    if (!currentPlan) return null;
+    // 1. ローカルストレージ（PlanContextのメモリ）から探す
+    const localName = getPatientName(currentPlan.hash_id);
+    // 2. なければ raw_data.name (サーバー側でハッシュ化されている場合はそれ) を使う
+    return localName || currentPlan.raw_data?.name || "名称未設定";
+  }, [currentPlan, getPatientName]);
 
   const [editingItem, setEditingItem] = useState<PlanItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -314,7 +324,6 @@ const RightPanel: React.FC = () => {
       console.log(`Generating ${item.title}...`);
       
       // 生成開始時点のデータ (文脈として使用)
-      // 注意: 保存時にはこれを使わず、完了時点の最新データを使う
       const contextRawData = currentPlanRef.current?.raw_data || {};
       const planId = currentPlanRef.current?.plan_id;
 
@@ -326,8 +335,7 @@ const RightPanel: React.FC = () => {
         contextRawData 
       );
       
-      // 保存処理: 生成完了時点の最新データをRefから取得してマージする
-      // これにより、他で並行して行われた更新を取り込む
+      // 保存処理
       const latestRawData = currentPlanRef.current?.raw_data || {};
       const newRawData = { ...latestRawData, [item.targetKey]: result };
       
@@ -340,7 +348,7 @@ const RightPanel: React.FC = () => {
         updatedPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, newRawData);
       }
 
-      // 画面更新 (ここでのレンダリングエラーを防ぐため、オブジェクトが正しいか確認)
+      // 画面更新
       if (updatedPlan) {
         setCurrentPlan(updatedPlan);
       }
@@ -358,18 +366,15 @@ const RightPanel: React.FC = () => {
     if (!patientData) { alert('患者データがありません。'); return; }
     if (!window.confirm('全項目を順次生成しますか？\n（既存の入力内容は上書きされます）')) return;
 
-    // バッチ処理中はRefではなくローカル変数を頼りにシーケンシャルに処理する
     let localCurrentPlan = currentPlanRef.current;
     let localRawData = localCurrentPlan?.raw_data || {};
 
     try {
-      // planStructure (階層構造) を上から順にループ
       for (const node of planStructure) {
         
         // === ケース1: 単体アイテム ===
         if (node.type === 'item') {
           toggleGenerating(node.id, true);
-          // 単体生成API呼び出し (currentRawData を渡す)
           const { result } = await ApiClient.generateCustom(patientData, node.prompt, node.targetKey, localRawData);
           localRawData = { ...localRawData, [node.targetKey]: result };
           
@@ -383,10 +388,8 @@ const RightPanel: React.FC = () => {
         } 
         else if (node.type === 'group') {
           toggleGenerating(node.id, true);
-          // グループ内の生成対象リストを作成
           const batchItems = node.children.map(child => ({ targetKey: child.targetKey, prompt: child.prompt }));
           if (batchItems.length > 0) {
-            // バッチ生成API呼び出し (currentRawData を渡す)
             const results = await ApiClient.generateBatch(patientData, batchItems, localRawData);
             localRawData = { ...localRawData, ...results };
             if (localCurrentPlan) {
@@ -404,7 +407,6 @@ const RightPanel: React.FC = () => {
       console.error('Batch generation failed:', error);
       alert('一括生成中にエラーが発生しました。中断します。');
     } finally {
-      // 念のため全クリア
       setGeneratingIds(new Set());
     }
   };
@@ -463,15 +465,12 @@ const RightPanel: React.FC = () => {
     
     if (overInfo) {
       if (overInfo.node.type === 'group') {
-        // グループの上にドラッグ -> そのグループの中へ
         overParentId = overInfo.node.id;
       } else {
-        // アイテムの上にドラッグ -> そのアイテムと同じ親へ
         overParentId = overInfo.parent ? overInfo.parent.id : 'root';
       }
     }
 
-    // 異なるコンテナへの移動の場合のみ処理
     if (activeParentId !== overParentId) {
       setPlanStructure((prev) => {
         const next = JSON.parse(JSON.stringify(prev)) as PlanStructure;
@@ -607,18 +606,18 @@ const RightPanel: React.FC = () => {
   };
 
   const handleDeleteItem = (id: string) => {
-     if(!window.confirm('削除しますか？')) return;
-     const deleteRecursive = (list: PlanStructure): PlanStructure => {
+      if(!window.confirm('削除しますか？')) return;
+      const deleteRecursive = (list: PlanStructure): PlanStructure => {
         return list.filter(node => node.id !== id).map(node => {
              if(node.type === 'group') {
                return { ...node, children: deleteRecursive(node.children) };
              }
              return node;
           });
-     };
-     setPlanStructure(deleteRecursive(planStructure));
-     setIsEditModalOpen(false);
-     saveStructureToStorage();
+      };
+      setPlanStructure(deleteRecursive(planStructure));
+      setIsEditModalOpen(false);
+      saveStructureToStorage();
   };
 
   const rootIds = useMemo(() => planStructure.map(n => n.id), [planStructure]);
@@ -629,9 +628,20 @@ const RightPanel: React.FC = () => {
       {/* ぐるぐる用CSS定義 */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
-      {/* Header */}
-      <div style={{ padding: '16px', backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4f46e5', display: 'flex', gap: '8px' }}><Sparkles size={20}/> AI Co-Editor</h2>
+      {/* Header (Modified for Privacy Display) */}
+      <div style={{ padding: '16px', backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4f46e5', display: 'flex', gap: '8px', margin: 0 }}>
+            <Sparkles size={20}/> AI Co-Editor
+          </h2>
+          {/* [追加] 実名表示バッジ */}
+          {displayName && (
+            <span style={{ fontSize: '0.85rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0', fontWeight: 500 }}>
+              {displayName} 様
+            </span>
+          )}
+        </div>
+
         <div style={{ position: 'relative' }}>
           <button onClick={() => setShowPresets(!showPresets)} style={{ border:'none', background:'none', cursor:'pointer' }}><MoreHorizontal size={18} /></button>
           {showPresets && (
@@ -704,7 +714,7 @@ const RightPanel: React.FC = () => {
           </SortableContext>
           
           <DragOverlay dropAnimation={defaultDropAnimationSideEffects({ styles: { active: { opacity: '1' } } })}>
-             {activeItem && activeItem.type === 'item' ? (
+              {activeItem && activeItem.type === 'item' ? (
                 <div>
                    <ItemCard 
                      item={activeItem as PlanItem} 

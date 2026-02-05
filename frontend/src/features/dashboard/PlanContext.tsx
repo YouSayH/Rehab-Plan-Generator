@@ -44,6 +44,10 @@ const DEFAULT_PLAN_STRUCTURE: PlanStructure = [
   },
 ];
 
+// ローカルストレージのキー定数
+const STORAGE_KEY_PLAN_STRUCTURE = 'rehab_app_plan_structure';
+const STORAGE_KEY_NAME_MAP = 'rehab_app_patient_name_map';
+
 interface PlanContextType {
   // 生成結果の計画書
   currentPlan: PlanRead | null;
@@ -63,6 +67,19 @@ interface PlanContextType {
   // 設定のリセット・保存
   resetPlanStructure: () => void;
   saveStructureToStorage: () => void;
+
+  // プライバシー保護対応（ハッシュIDと実名のマッピング）
+  /**
+   * ハッシュIDに対応する実名をブラウザ内に登録します。
+   * (計画書生成開始時や、ファイルアップロード時に呼び出してください)
+   */
+  registerPatientName: (hashId: string, name: string) => void;
+
+  /**
+   * ハッシュIDから実名を取得します。
+   * (ヘッダー表示時などに使用してください)
+   */
+  getPatientName: (hashId: string) => string | null;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
@@ -74,38 +91,52 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   // パネル構造のState (初期値はデフォルト設定)
   const [planStructure, setPlanStructure] = useState<PlanStructure>(DEFAULT_PLAN_STRUCTURE);
+  
+  // 実名マッピング（メモリ上）
+  const [nameMap, setNameMap] = useState<Record<string, string>>({});
 
   // 初期ロード時にLocalStorageから復元
   useEffect(() => {
-    // 新しいキーを使用
-    const savedConfig = localStorage.getItem('rehab_app_plan_structure');
-    
-    // 旧キーからの移行が必要な場合はここで処理可能だが、今回はシンプルに新規キー優先
+    // 1. パネル構造の復元
+    const savedConfig = localStorage.getItem(STORAGE_KEY_PLAN_STRUCTURE);
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        if (Array.isArray(parsed)) {
-          setPlanStructure(parsed);
-        }
-      } catch (e) {
-        console.error('Failed to load plan structure', e);
-      }
+        if (Array.isArray(parsed)) setPlanStructure(parsed);
+      } catch (e) { console.error('Failed to load plan structure', e); }
+    }
+
+    // 2. 実名マッピングの復元
+    const savedMap = localStorage.getItem(STORAGE_KEY_NAME_MAP);
+    if (savedMap) {
+      try {
+        const parsed = JSON.parse(savedMap);
+        setNameMap(parsed);
+      } catch (e) { console.error('Failed to load name map', e); }
     }
   }, []);
 
   const saveStructureToStorage = () => {
-    // 階層構造（並び順・グループ状態）をそのまま保存
-    localStorage.setItem('rehab_app_plan_structure', JSON.stringify(planStructure));
+    localStorage.setItem(STORAGE_KEY_PLAN_STRUCTURE, JSON.stringify(planStructure));
   };
 
   const resetPlanStructure = () => {
-    if (window.confirm('パネル設定を初期状態に戻しますか？\n（カスタムパネルやグループ設定は失われます）')) {
+    if (window.confirm('パネル設定を初期状態に戻しますか？')) {
       setPlanStructure(DEFAULT_PLAN_STRUCTURE);
-      localStorage.removeItem('rehab_app_plan_structure');
-      
-      // 旧設定があればついでに削除
-      localStorage.removeItem('rehab_app_card_config');
+      localStorage.removeItem(STORAGE_KEY_PLAN_STRUCTURE);
+      localStorage.removeItem('rehab_app_card_config'); // 旧設定削除
     }
+  };
+
+  // 実名マッピング管理ロジック
+  const registerPatientName = (hashId: string, name: string) => {
+    const newMap = { ...nameMap, [hashId]: name };
+    setNameMap(newMap);
+    localStorage.setItem(STORAGE_KEY_NAME_MAP, JSON.stringify(newMap));
+  };
+
+  const getPatientName = (hashId: string): string | null => {
+    return nameMap[hashId] || null;
   };
 
   return (
@@ -114,7 +145,8 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       patientData, setPatientData,
       isGenerating, setIsGenerating,
       planStructure, setPlanStructure, 
-      resetPlanStructure, saveStructureToStorage
+      resetPlanStructure, saveStructureToStorage,
+      registerPatientName, getPatientName
     }}>
       {children}
     </PlanContext.Provider>

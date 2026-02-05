@@ -46,8 +46,19 @@ class PlanGenerationUseCase:
         """
         logger.info(f"Starting plan generation for patient: {hash_id}")
 
+        # =========================================================================
+        # [Privacy Protection] PII Scrubbing
+        # システム側に個人情報を残さないため、処理開始直後に氏名をハッシュIDに置換し、
+        # メモリ上の実名情報を破棄する。
+        # これにより、以降の export_to_mapping_format や LLMプロンプトには実名が含まれなくなる。
+        # =========================================================================
+        if patient_data.basic:
+            # 実名をログに出力しないよう注意しながら、ハッシュIDで上書き
+            patient_data.basic.name = hash_id
+        
         # 1. データの正規化 (Pydantic -> Flat Dict)
         # ネストされた構造を、context_builderが処理しやすいフラットな形式に変換
+        # ※ここで変換されるデータも、上記で置換したハッシュIDとなる
         flat_data = patient_data.export_to_mapping_format()
 
         # 2. 事実情報の構築 (Context Builder)
