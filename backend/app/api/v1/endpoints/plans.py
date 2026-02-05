@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.api.dependencies import get_db
-from app.schemas.schemas import PlanCreate, PlanRead, PlanUpdate, PlanCustomGenerate
+from app.schemas.schemas import PlanCreate, PlanRead, PlanUpdate, PlanCustomGenerate, PlanBatchGenerate
 from app.infrastructure.repositories.plan_repository import PlanRepository
 
 from app.schemas.extraction_schemas import PatientExtractionSchema
@@ -113,6 +113,30 @@ async def generate_custom_part(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate content: {str(e)}"
+        )
+    
+@router.post("/generate/batch", response_model=dict)
+async def generate_batch_parts(
+    request: PlanBatchGenerate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    指定された複数の項目を一括生成します。
+    """
+    print(f"[API] POST /plans/generate/batch Request received. Items: {len(request.items)}")
+    
+    usecase = PlanGenerationUseCase(db)
+    try:
+        result_dict = await usecase.execute_batch(
+            patient_data=request.patient_data,
+            items=request.items
+        )
+        return result_dict
+    except Exception as e:
+        print(f"[API] Error during batch generation: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate batch content: {str(e)}"
         )
 
 @router.post("/generate/{hash_id}", response_model=PlanRead)

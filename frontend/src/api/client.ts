@@ -21,7 +21,7 @@ export const ApiClient = {
     return response.json();
   },
 
-  // ▼▼▼ 追加: 計画書の新規作成 (空の計画書または初期データ付きを作成) ▼▼▼
+  // 計画書の新規作成 (空の計画書または初期データ付きを作成)
   createPlan: async (hashId: string, rawData: Record<string, any> = {}): Promise<PlanRead> => {
     const response = await fetch(`${API_BASE_URL}/plans/`, {
       method: 'POST',
@@ -40,10 +40,14 @@ export const ApiClient = {
 
     return response.json();
   },
-  // ▲▲▲ 追加ここまで ▲▲▲
 
   // カスタム部分生成
-  generateCustom: async (patientData: PatientExtractionData, prompt: string, targetKey?: string): Promise<{ result: string }> => {
+  generateCustom: async (
+    patientData: PatientExtractionData, 
+    prompt: string, 
+    targetKey?: string,
+    currentPlan?: Record<string, any>
+  ): Promise<{ result: string }> => {
     const response = await fetch(`${API_BASE_URL}/plans/generate/custom`, {
       method: 'POST',
       headers: {
@@ -52,7 +56,40 @@ export const ApiClient = {
       body: JSON.stringify({
         patient_data: patientData,
         prompt: prompt,
-        target_key: targetKey
+        target_key: targetKey,
+        current_plan: currentPlan
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+
+    return response.json();
+  },
+
+  // バッチ生成 (グループ単位の一括生成)
+  generateBatch: async (
+    patientData: PatientExtractionData, 
+    items: { targetKey: string; prompt: string }[],
+    currentPlan?: Record<string, any>
+  ): Promise<Record<string, string>> => {
+    
+    // backendの期待する target_key (スネークケース) に変換
+    const mappedItems = items.map(item => ({
+      target_key: item.targetKey,
+      prompt: item.prompt
+    }));
+
+    const response = await fetch(`${API_BASE_URL}/plans/generate/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        patient_data: patientData,
+        items: mappedItems,
+        current_plan: currentPlan
       }),
     });
 

@@ -1,8 +1,9 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import create_model, Field
 
 from app.adapters.llm.factory import get_llm_client
 from app.core.constants import PATIENT_FIELD_LABELS
@@ -110,7 +111,8 @@ class PlanGenerationUseCase:
     async def execute_custom(
         self,
         patient_data: Dict[str, Any],
-        prompt: str
+        prompt: str,
+        current_plan: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         カスタムプロンプトによる部分生成を実行します。
@@ -118,6 +120,7 @@ class PlanGenerationUseCase:
         Args:
             patient_data (Dict): 患者データ（辞書形式）
             prompt (str): ユーザー定義のプロンプト
+            current_plan (Optional[Dict]): 既に生成済みの計画書データ（文脈用）
 
         Returns:
             str: 生成されたテキスト
@@ -128,13 +131,19 @@ class PlanGenerationUseCase:
         
         facts_str = json.dumps(patient_data, ensure_ascii=False, indent=2)
         
+        # 既存計画のコンテキスト化
+        plan_context_str = ""
+        if current_plan:
+            plan_str = json.dumps(current_plan, ensure_ascii=False, indent=2)
+            plan_context_str = f"\n【既存の計画書データ (参考)】\nすでに決定している以下の計画内容と整合性が取れるように生成してください。\n{plan_str}\n"
+
         full_prompt = f"""
 あなたはリハビリテーション計画書の作成支援AIです。
 以下の患者データを参照し、ユーザーの指示に従って計画書の一部を作成してください。
 
 【患者データ】
 {facts_str}
-
+{plan_context_str}
 【指示】
 {prompt}
 
@@ -146,3 +155,52 @@ class PlanGenerationUseCase:
         response_text = await self.llm_client.generate_text(full_prompt)
         
         return response_text
+
+    async def execute_batch(
+        self,
+        patient_data: Dict[str, Any],
+        items: List[Any],
+        current_plan: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        指定された複数の項目(キーとプロンプト)に基づいて一括生成を行う。
+        """
+        # 1. 事実情報の構築 (簡易版)
+        facts_str = json.dumps(patient_data, ensure_ascii=False, indent=2)
+
+        # 2. 動的なPydanticモデルの生成
+        # itemsの内容に基づいて、{ "risk_txt": (str, Field(...)), "goal_txt": ... } という定義を作る
+        field_definitions = {
+            item.target_key: (str, Field(description=item.prompt))
+            for item in items
+        }
+        # モデル名は動的に生成
+        DynamicBatchSchema = create_model('DynamicBatchSchema', **field_definitions)
+
+        # 3. プロンプト作成
+        # 既存計画のコンテキスト化
+        plan_context_str = ""
+        if current_plan:
+            plan_str = json.dumps(current_plan, ensure_ascii=False, indent=2)
+            plan_context_str = f"\n【既存の計画書データ (参考)】\nすでに決定している以下の計画内容と整合性が取れるように生成してください。\n{plan_str}\n"
+
+        prompt = f"""
+あなたはリハビリテーション計画書の作成支援AIです。
+以下の患者データを参照し、指定された項目の内容を生成してください。
+
+【患者データ】
+{facts_str}
+{plan_context_str}
+【指示】
+各項目について、それぞれのdescription（指示）に従って適切な内容を生成してください。
+JSON形式で出力してください。
+"""
+        logger.info(f"Executing Batch Generation for keys: {[i.target_key for i in items]}")
+
+        # 4. LLM実行 (Structured Output)
+        try:
+            response_dict = await self.llm_client.generate_json(prompt, DynamicBatchSchema)
+            return response_dict
+        except Exception as e:
+            logger.error(f"Batch generation failed: {e}", exc_info=True)
+            raise RuntimeError(f"Batch generation failed: {e}") from e

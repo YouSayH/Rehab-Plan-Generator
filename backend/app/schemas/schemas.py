@@ -88,3 +88,13 @@ class PlanCustomGenerate(BaseModel):
     patient_data: Dict[str, Any]
     prompt: str
     target_key: Optional[str] = None
+    current_plan: Optional[Dict[str, Any]] = None
+
+class BatchGenerateItem(BaseModel):
+    target_key: str
+    prompt: str
+
+class PlanBatchGenerate(BaseModel):
+    patient_data: Dict[str, Any]
+    items: List[BatchGenerateItem]
+    current_plan: Optional[Dict[str, Any]] = None

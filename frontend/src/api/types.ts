@@ -88,19 +88,6 @@ export const CELL_MAPPING: Record<string, CellMapping> = {
   policy_content_txt: { r: 15, c: 1 }, 
 };
 
-// ==========================================
-// Card Configuration Types
-// ==========================================
-
-export interface CardConfig {
-  id: string;
-  title: string;
-  description: string;
-  prompt: string;
-  targetKey: string;      // raw_dataのキー (例: main_risks_txt)
-  targetCell?: string;    // ユーザー入力用のセル番号 (例: "B12")
-}
-
 // ユーティリティ: A1形式 ("B12") を {r, c} に変換
 export const parseCellAddress = (address: string): CellMapping | null => {
   const match = address.toUpperCase().match(/^([A-Z]+)([0-9]+)$/);
@@ -133,3 +120,48 @@ export const stringifyCellAddress = (mapping: CellMapping): string => {
   }
   return `${colStr}${mapping.r + 1}`;
 };
+
+
+// ==========================================
+// Plan Configuration Types (Hierarchical)
+// ==========================================
+
+// パネルの種類を判別するユニオン型
+export type PlanNodeType = 'item' | 'group';
+
+/**
+ * 単体の生成パネル (Leaf Node)
+ * 従来の CardConfig に相当しますが、type プロパティが追加されています。
+ */
+export interface PlanItem {
+  id: string;
+  type: 'item';
+  title: string;
+  description: string;
+  prompt: string;
+  targetKey: string;      // raw_dataのキー (例: main_risks_txt)
+  targetCell?: string;    // ユーザー入力用のセル番号 (例: "B12")
+}
+
+/**
+ * パネルをまとめるグループ (Container Node)
+ * フォルダ機能を提供します。
+ */
+export interface PlanGroup {
+  id: string;
+  type: 'group';
+  title: string;
+  description?: string;
+  children: PlanItem[];   // グループ内のアイテムリスト
+  isCollapsed?: boolean;  // UI上の開閉状態
+}
+
+/**
+ * リスト内で扱う要素のユニオン型
+ */
+export type PlanNode = PlanItem | PlanGroup;
+
+/**
+ * 全体の構造定義 (Stateとして保持する型)
+ */
+export type PlanStructure = PlanNode[];

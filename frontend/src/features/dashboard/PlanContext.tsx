@@ -1,10 +1,13 @@
+// frontend/src/features/dashboard/PlanContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { PlanRead, PatientExtractionData, CardConfig, stringifyCellAddress, CELL_MAPPING } from '../../api/types';
+import { PlanRead, PatientExtractionData, PlanStructure, stringifyCellAddress, CELL_MAPPING } from '../../api/types';
 
-// デフォルトのカード設定
-const DEFAULT_CARDS: CardConfig[] = [
+
+// デフォルトのパネル設定（階層構造）
+const DEFAULT_PLAN_STRUCTURE: PlanStructure = [
   { 
     id: 'c1', 
+    type: 'item',
     title: '現状評価（リスク・禁忌）', 
     description: 'バイタル、リスク管理、痛みの状態を生成',
     prompt: `患者データに基づき、現状の問題点、リスク管理事項、禁忌事項を箇条書きでまとめてください。
@@ -17,6 +20,7 @@ const DEFAULT_CARDS: CardConfig[] = [
   },
   { 
     id: 'c2', 
+    type: 'item',
     title: '目標設定（短期）', 
     description: 'FIM予測に基づいた短期SMARTゴール',
     prompt: `患者の現在のADL能力と予後予測に基づき、1ヶ月後の短期目標をSMARTの法則に従って3つ提案してください。
@@ -28,6 +32,7 @@ const DEFAULT_CARDS: CardConfig[] = [
   },
   { 
     id: 'c3', 
+    type: 'item',
     title: '治療方針', 
     description: '具体的な訓練内容と頻度',
     prompt: `目標達成に向けた具体的なリハビリテーション治療プログラム、頻度、留意点を提案してください。
@@ -51,11 +56,13 @@ interface PlanContextType {
   isGenerating: boolean;
   setIsGenerating: (state: boolean) => void;
 
-  // カード設定管理
-  cards: CardConfig[];
-  setCards: (cards: CardConfig[]) => void;
-  resetCards: () => void;
-  saveCardsToStorage: () => void;
+  // パネル構造管理 (階層構造対応)
+  planStructure: PlanStructure;
+  setPlanStructure: (structure: PlanStructure) => void;
+  
+  // 設定のリセット・保存
+  resetPlanStructure: () => void;
+  saveStructureToStorage: () => void;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
@@ -65,28 +72,40 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [patientData, setPatientData] = useState<PatientExtractionData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // カード設定のState
-  const [cards, setCards] = useState<CardConfig[]>(DEFAULT_CARDS);
+  // パネル構造のState (初期値はデフォルト設定)
+  const [planStructure, setPlanStructure] = useState<PlanStructure>(DEFAULT_PLAN_STRUCTURE);
 
   // 初期ロード時にLocalStorageから復元
   useEffect(() => {
-    const savedCards = localStorage.getItem('rehab_app_card_config');
-    if (savedCards) {
+    // 新しいキーを使用
+    const savedConfig = localStorage.getItem('rehab_app_plan_structure');
+    
+    // 旧キーからの移行が必要な場合はここで処理可能だが、今回はシンプルに新規キー優先
+    if (savedConfig) {
       try {
-        setCards(JSON.parse(savedCards));
+        const parsed = JSON.parse(savedConfig);
+        if (Array.isArray(parsed)) {
+          setPlanStructure(parsed);
+        }
       } catch (e) {
-        console.error('Failed to load card config', e);
+        console.error('Failed to load plan structure', e);
       }
     }
   }, []);
 
-  const saveCardsToStorage = () => {
-    localStorage.setItem('rehab_app_card_config', JSON.stringify(cards));
+  const saveStructureToStorage = () => {
+    // 階層構造（並び順・グループ状態）をそのまま保存
+    localStorage.setItem('rehab_app_plan_structure', JSON.stringify(planStructure));
   };
 
-  const resetCards = () => {
-    setCards(DEFAULT_CARDS);
-    localStorage.removeItem('rehab_app_card_config');
+  const resetPlanStructure = () => {
+    if (window.confirm('パネル設定を初期状態に戻しますか？\n（カスタムパネルやグループ設定は失われます）')) {
+      setPlanStructure(DEFAULT_PLAN_STRUCTURE);
+      localStorage.removeItem('rehab_app_plan_structure');
+      
+      // 旧設定があればついでに削除
+      localStorage.removeItem('rehab_app_card_config');
+    }
   };
 
   return (
@@ -94,7 +113,8 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       currentPlan, setCurrentPlan, 
       patientData, setPatientData,
       isGenerating, setIsGenerating,
-      cards, setCards, resetCards, saveCardsToStorage
+      planStructure, setPlanStructure, 
+      resetPlanStructure, saveStructureToStorage
     }}>
       {children}
     </PlanContext.Provider>
