@@ -115,9 +115,14 @@ const ItemCard: React.FC<ItemCardProps> = ({
 // 2. Sortable Logic Wrappers
 // ==============================================================
 
-// アニメーション設定を追加し、ドラッグ終了時のスタイル残留を防ぐ
-const animateLayoutChanges = (args: any) => 
-  defaultAnimateLayoutChanges({ ...args, wasDragging: true });
+// アニメーション設定を修正し、ドラッグ終了時のスタイル残留を防ぐ
+const animateLayoutChanges = (args: any) => {
+  const { isSorting, wasDragging } = args;
+  if (isSorting || wasDragging) {
+    return defaultAnimateLayoutChanges(args);
+  }
+  return true;
+};
 
 // Sortable Item (Leaf)
 const SortablePlanItem: React.FC<{ 
@@ -142,8 +147,6 @@ const SortablePlanItem: React.FC<{
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    // activeIdと一致する場合のみ薄くする（DndKitのisDraggingが残る問題への対策）
-    opacity: (isDragging && activeId === item.id) ? 0.3 : 1,
     marginBottom: '12px',
     zIndex: isDragging ? 999 : 'auto', 
     position: 'relative' as const
@@ -186,7 +189,6 @@ const SortablePlanGroup: React.FC<{
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: (isDragging && activeId === group.id) ? 0.5 : 1,
     backgroundColor: '#f1f5f9',
     borderRadius: '12px',
     padding: '12px',
@@ -701,9 +703,9 @@ const RightPanel: React.FC = () => {
             })}
           </SortableContext>
           
-          <DragOverlay dropAnimation={defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } })}>
+          <DragOverlay dropAnimation={defaultDropAnimationSideEffects({ styles: { active: { opacity: '1' } } })}>
              {activeItem && activeItem.type === 'item' ? (
-                <div style={{ opacity: 0.9 }}>
+                <div>
                    <ItemCard 
                      item={activeItem as PlanItem} 
                      currentText={currentPlan?.raw_data?.[(activeItem as PlanItem).targetKey] || ''} 
@@ -712,7 +714,7 @@ const RightPanel: React.FC = () => {
                    />
                 </div>
              ) : activeItem && activeItem.type === 'group' ? (
-                <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '12px', border: '1px dashed #cbd5e1', opacity: 0.9 }}>
+                <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                   <strong>{(activeItem as PlanGroup).title}</strong>
                 </div>
              ) : null}
