@@ -3,7 +3,7 @@ import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';
 import '@univerjs/sheets-ui/lib/index.css';
 
-import { Univer, LocaleType, UniverInstanceType, ICommandService, WrapStrategy } from '@univerjs/core';
+import { Univer, LocaleType, UniverInstanceType, ICommandService } from '@univerjs/core';
 import { defaultTheme } from '@univerjs/design';
 import { UniverDocsPlugin } from '@univerjs/docs';
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui';
@@ -14,19 +14,29 @@ import { UniverSheetsFormulaPlugin } from '@univerjs/sheets-formula';
 import { UniverSheetsUIPlugin } from '@univerjs/sheets-ui';
 import { UniverUIPlugin } from '@univerjs/ui';
 
-// Facade APIが利用可能な場合はこちらを使用 (npm install @univerjs/facade が必要)
-// import { FUniver } from '@univerjs/facade';
-
 import { usePlanContext } from './PlanContext';
-// ユーティリティと型定義を追加インポート
-import { CELL_MAPPING, parseCellAddress, CellMapping } from '../../api/types';
+import { CELL_MAPPING, parseCellAddress, CellMapping, PlanStructure, PlanItem } from '../../api/types';
 
 const UniverSheet: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const univerRef = useRef<Univer | null>(null);
   
-  // Contextから currentPlan と cards (ユーザー定義設定) を取得
-  const { currentPlan, cards } = usePlanContext();
+  // cards ではなく planStructure を取得
+  const { currentPlan, planStructure } = usePlanContext();
+
+  // ヘルパー: 階層構造から指定されたキーを持つアイテムを探す
+  const findItemByKey = (structure: PlanStructure, key: string): PlanItem | undefined => {
+    for (const node of structure) {
+      if (node.type === 'item' && node.targetKey === key) {
+        return node;
+      }
+      if (node.type === 'group') {
+        const found = node.children.find(child => child.targetKey === key);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
 
   // 1. Univer初期化
   useEffect(() => {
@@ -34,7 +44,7 @@ const UniverSheet: React.FC = () => {
 
     const univer = new Univer({
       theme: defaultTheme,
-      locale: LocaleType.JA_JP, // 日本語を指定
+      locale: LocaleType.JA_JP, 
       locales: {
         // ロケール定義がないと "Locale not initialized" エラーになるため、
         // インポートエラーを避けるために一旦空のオブジェクトを定義して回避します。
@@ -94,9 +104,10 @@ const UniverSheet: React.FC = () => {
     };
   }, []);
 
-  // 2. データ反映ロジック (動的マッピング対応)
+  // 2. データ反映ロジック
   useEffect(() => {
-    if (!currentPlan || !univerRef.current) return;
+    // planStructureが読み込まれるまで待機
+    if (!currentPlan || !univerRef.current || !planStructure) return;
 
     console.log('[Univer] Updating sheet with plan data...');
 
@@ -106,7 +117,6 @@ const UniverSheet: React.FC = () => {
     const commandService = univerRef.current.__getInjector().get(ICommandService);
     if (!commandService) return;
 
-    // 現在生成されているデータのキー一覧を取得
     const dataKeys = Object.keys(currentPlan.raw_data);
 
     dataKeys.forEach((key) => {
@@ -114,25 +124,19 @@ const UniverSheet: React.FC = () => {
       // 値がない場合はスキップ
       if (textValue === undefined || textValue === null) return;
 
-      // 書き込み先の座標を決定する変数
       let mapping: CellMapping | null = null;
 
-      // 【優先順位 1】 カード設定 (ユーザー定義)
-      // そのデータのキー(targetKey)を持つカードを探す
-      const matchingCard = cards.find(c => c.targetKey === key);
+      // 修正: ヘルパー関数を使って階層構造から検索
+      const matchingCard = findItemByKey(planStructure, key);
       
-      // カードが見つかり、かつ有効なセル指定("A1"など)がある場合
       if (matchingCard && matchingCard.targetCell) {
         mapping = parseCellAddress(matchingCard.targetCell);
       }
 
-      // 【優先順位 2】 デフォルトマッピング (types.ts)
-      // カード設定がない、またはセル指定が無効だった場合のフォールバック
       if (!mapping && CELL_MAPPING[key]) {
         mapping = CELL_MAPPING[key];
       }
 
-      // マッピングが確定できれば書き込む
       if (mapping) {
         const { r, c } = mapping;
         
@@ -152,7 +156,7 @@ const UniverSheet: React.FC = () => {
       }
     });
 
-  }, [currentPlan, cards]); // cardsの変更も監視し、設定が変われば即再描画
+  }, [currentPlan, planStructure]); // planStructureの変更も監視
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

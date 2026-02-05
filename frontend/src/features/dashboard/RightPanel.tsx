@@ -1,6 +1,6 @@
 // frontend/src/features/dashboard/RightPanel.tsx
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -12,14 +12,16 @@ import {
   defaultDropAnimationSideEffects,
   DragStartEvent,
   DragOverEvent,
-  DragEndEvent
+  DragEndEvent,
+  MeasuringStrategy
 } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable
+  useSortable,
+  defaultAnimateLayoutChanges 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { 
@@ -33,7 +35,7 @@ import { ApiClient } from '../../api/client';
 import { PlanItem, PlanGroup, PlanNode, PlanStructure, CELL_MAPPING } from '../../api/types';
 
 // ==============================================================
-// 1. Visual Components (見た目のみを担当)
+// 1. Visual Components
 // ==============================================================
 
 interface ItemCardProps {
@@ -80,7 +82,7 @@ const ItemCard: React.FC<ItemCardProps> = ({
             cursor: isGenerating ? 'not-allowed' : 'pointer', 
           }}
         >
-          {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />} 
+          {isGenerating ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={16} />} 
           {isGenerating ? '生成中...' : '生成'}
         </button>
         {item.targetCell && (
@@ -93,7 +95,7 @@ const ItemCard: React.FC<ItemCardProps> = ({
       {/* Text Area */}
       <div style={{ borderTop: '1px solid #f8fafc', paddingTop: '8px' }}>
         <textarea
-          value={currentText}
+          value={currentText || ''} // undefined対策
           onChange={(e) => onTextChange(e.target.value)}
           onBlur={(e) => onTextBlur(e.target.value)}
           placeholder="まだ生成されていません"
@@ -113,26 +115,38 @@ const ItemCard: React.FC<ItemCardProps> = ({
 // 2. Sortable Logic Wrappers
 // ==============================================================
 
+// アニメーション設定を追加し、ドラッグ終了時のスタイル残留を防ぐ
+const animateLayoutChanges = (args: any) => 
+  defaultAnimateLayoutChanges({ ...args, wasDragging: true });
+
 // Sortable Item (Leaf)
 const SortablePlanItem: React.FC<{ 
   item: PlanItem; 
   onGenerate: (id: string) => void;
-  generatingId: string | null;
+  isGenerating: boolean;
   onEdit: (item: PlanItem) => void;
   currentPlanData: Record<string, any>;
   onTextUpdate: (key: string, val: string) => void;
   onTextBlur: (key: string, val: string) => void;
-}> = ({ item, onGenerate, generatingId, onEdit, currentPlanData, onTextUpdate, onTextBlur }) => {
+  activeId: string | null; // 親のDndContextの状態を明示的に受け取る
+}> = ({ item, onGenerate, isGenerating, onEdit, currentPlanData, onTextUpdate, onTextBlur, activeId }) => {
   
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging
-  } = useSortable({ id: item.id, data: { type: 'item', item } });
+  } = useSortable({ 
+    id: item.id, 
+    data: { type: 'item', item },
+    animateLayoutChanges
+  });
 
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1,
-    marginBottom: '12px'
+    // activeIdと一致する場合のみ薄くする（DndKitのisDraggingが残る問題への対策）
+    opacity: (isDragging && activeId === item.id) ? 0.3 : 1,
+    marginBottom: '12px',
+    zIndex: isDragging ? 999 : 'auto', 
+    position: 'relative' as const
   };
 
   return (
@@ -140,7 +154,7 @@ const SortablePlanItem: React.FC<{
       <ItemCard 
         item={item}
         currentText={currentPlanData?.[item.targetKey] || ''}
-        isGenerating={generatingId === item.id}
+        isGenerating={isGenerating}
         onGenerate={() => onGenerate(item.id)}
         onEdit={() => onEdit(item)}
         onTextChange={(val) => onTextUpdate(item.targetKey, val)}
@@ -157,22 +171,29 @@ const SortablePlanGroup: React.FC<{
   isGenerating: boolean;
   onEdit: (group: PlanGroup) => void;
   onDelete: (groupId: string) => void;
-}> = ({ group, children, isGenerating, onEdit, onDelete }) => {
+  activeId: string | null;
+}> = ({ group, children, isGenerating, onEdit, onDelete, activeId }) => {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging
-  } = useSortable({ id: group.id, data: { type: 'group', group } });
+  } = useSortable({ 
+    id: group.id, 
+    data: { type: 'group', group },
+    animateLayoutChanges 
+  });
 
   const [isOpen, setIsOpen] = useState(!group.isCollapsed);
 
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: (isDragging && activeId === group.id) ? 0.5 : 1,
     backgroundColor: '#f1f5f9',
     borderRadius: '12px',
     padding: '12px',
     marginBottom: '16px',
-    border: '1px dashed #cbd5e1'
+    border: '1px dashed #cbd5e1',
+    zIndex: isDragging ? 999 : 'auto',
+    position: 'relative' as const
   };
 
   return (
@@ -187,10 +208,9 @@ const SortablePlanGroup: React.FC<{
           <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#475569' }}>{group.title}</span>
         </button>
         
-        {/* ローディング表示 */}
         {isGenerating && (
            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#4f46e5', marginLeft: '8px' }}>
-             <Loader2 size={14} className="animate-spin" /> 生成中...
+             <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> 生成中...
            </span>
         )}
 
@@ -198,20 +218,8 @@ const SortablePlanGroup: React.FC<{
           <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginRight: '4px' }}>
             {group.children.length} items
           </span>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onEdit(group); }} 
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
-            title="グループ編集"
-          >
-            <Edit3 size={14} />
-          </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onDelete(group.id); }} 
-            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '4px' }}
-            title="グループ削除"
-          >
-            <Trash2 size={14} />
-          </button>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(group); }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}><Edit3 size={14} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(group.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#cbd5e1', padding: '4px' }}><Trash2 size={14} /></button>
         </div>
       </div>
 
@@ -238,8 +246,13 @@ const RightPanel: React.FC = () => {
     resetPlanStructure, saveStructureToStorage 
   } = usePlanContext();
   
-  // UI State
-  const [generatingCardId, setGeneratingCardId] = useState<string | null>(null);
+  // 同時生成のためにSetでIDを管理
+  const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  
+  // 最新のPlanデータを常に保持するためのRef (非同期処理中のデータ競合回避用)
+  const currentPlanRef = useRef(currentPlan);
+  useEffect(() => { currentPlanRef.current = currentPlan; }, [currentPlan]);
+
   const [editingItem, setEditingItem] = useState<PlanItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<PlanGroup | null>(null);
@@ -273,6 +286,15 @@ const RightPanel: React.FC = () => {
     return null;
   };
 
+  const toggleGenerating = (id: string, state: boolean) => {
+    setGeneratingIds(prev => {
+      const next = new Set(prev);
+      if (state) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
   // Handlers
   const handleGenerate = async (itemId: string) => {
     const found = findNode(itemId, planStructure);
@@ -280,49 +302,63 @@ const RightPanel: React.FC = () => {
     const item = found.node as PlanItem;
 
     if (!patientData) { alert('患者データがありません'); return; }
+    
+    // 多重実行防止
+    if (generatingIds.has(item.id)) return;
 
-    setGeneratingCardId(item.id);
+    toggleGenerating(item.id, true);
+    
     try {
       console.log(`Generating ${item.title}...`);
       
-      // 現在のデータを取得 (文脈として渡すため)
-      const currentRawData = currentPlan?.raw_data || {};
+      // 生成開始時点のデータ (文脈として使用)
+      // 注意: 保存時にはこれを使わず、完了時点の最新データを使う
+      const contextRawData = currentPlanRef.current?.raw_data || {};
+      const planId = currentPlanRef.current?.plan_id;
 
-      // 第4引数に currentRawData を追加
+      // 生成API呼び出し
       const { result } = await ApiClient.generateCustom(
         patientData, 
         item.prompt, 
         item.targetKey,
-        currentRawData 
+        contextRawData 
       );
       
-      const newRawData = { ...currentRawData, [item.targetKey]: result };
-      if (currentPlan) {
-        setCurrentPlan({ ...currentPlan, raw_data: newRawData });
-        await ApiClient.updatePlan(currentPlan.plan_id, newRawData);
+      // 保存処理: 生成完了時点の最新データをRefから取得してマージする
+      // これにより、他で並行して行われた更新を取り込む
+      const latestRawData = currentPlanRef.current?.raw_data || {};
+      const newRawData = { ...latestRawData, [item.targetKey]: result };
+      
+      let updatedPlan;
+      if (planId) {
+        // 更新
+        updatedPlan = await ApiClient.updatePlan(planId, newRawData);
       } else {
-        const newPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, newRawData);
-        setCurrentPlan(newPlan);
+        // 新規作成
+        updatedPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, newRawData);
       }
+
+      // 画面更新 (ここでのレンダリングエラーを防ぐため、オブジェクトが正しいか確認)
+      if (updatedPlan) {
+        setCurrentPlan(updatedPlan);
+      }
+
     } catch (e) {
       console.error(e);
-      alert('生成エラー');
+      alert('生成エラーが発生しました');
     } finally {
-      setGeneratingCardId(null);
+      toggleGenerating(item.id, false);
     }
   };
 
-  // 全パネルの一括生成 (シーケンシャル + バッチ処理)
+  // 全パネルの一括生成
   const handleGenerateAll = async () => {
-    if (!patientData) {
-      alert('患者データがありません。');
-      return;
-    }
-    
+    if (!patientData) { alert('患者データがありません。'); return; }
     if (!window.confirm('全項目を順次生成しますか？\n（既存の入力内容は上書きされます）')) return;
 
-    // 現在の最新データを取得するためのローカル変数（State更新の遅延対策）
-    let currentRawData = currentPlan?.raw_data || {};
+    // バッチ処理中はRefではなくローカル変数を頼りにシーケンシャルに処理する
+    let localCurrentPlan = currentPlanRef.current;
+    let localRawData = localCurrentPlan?.raw_data || {};
 
     try {
       // planStructure (階層構造) を上から順にループ
@@ -330,72 +366,44 @@ const RightPanel: React.FC = () => {
         
         // === ケース1: 単体アイテム ===
         if (node.type === 'item') {
-          setGeneratingCardId(node.id); // UIでローディング表示
-          
+          toggleGenerating(node.id, true);
           // 単体生成API呼び出し (currentRawData を渡す)
-          const { result } = await ApiClient.generateCustom(
-            patientData, 
-            node.prompt, 
-            node.targetKey,
-            currentRawData
-          );
+          const { result } = await ApiClient.generateCustom(patientData, node.prompt, node.targetKey, localRawData);
+          localRawData = { ...localRawData, [node.targetKey]: result };
           
-          // データ更新
-          currentRawData = { ...currentRawData, [node.targetKey]: result };
-          
-          // DB保存 & 画面更新
-          if (currentPlan) {
-            await ApiClient.updatePlan(currentPlan.plan_id, currentRawData);
-            setCurrentPlan({ ...currentPlan, raw_data: currentRawData });
+          if (localCurrentPlan) {
+            localCurrentPlan = await ApiClient.updatePlan(localCurrentPlan.plan_id, localRawData);
           } else {
-            // 初回作成
-            const newPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, currentRawData);
-            setCurrentPlan(newPlan);
+            localCurrentPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, localRawData);
           }
+          setCurrentPlan(localCurrentPlan); // UI更新
+          toggleGenerating(node.id, false);
         } 
-        
-        // === ケース2: グループ (一括生成) ===
         else if (node.type === 'group') {
-          setGeneratingCardId(node.id); // グループ全体をローディング表示
-          
+          toggleGenerating(node.id, true);
           // グループ内の生成対象リストを作成
-          const batchItems = node.children.map(child => ({
-            targetKey: child.targetKey,
-            prompt: child.prompt
-          }));
-
+          const batchItems = node.children.map(child => ({ targetKey: child.targetKey, prompt: child.prompt }));
           if (batchItems.length > 0) {
-            console.log(`Batch generating group: ${node.title}`);
-            
             // バッチ生成API呼び出し (currentRawData を渡す)
-            const results = await ApiClient.generateBatch(
-              patientData, 
-              batchItems,
-              currentRawData
-            );
-            
-            // 結果をマージ
-            currentRawData = { ...currentRawData, ...results };
-            
-            // DB保存 & 画面更新
-            if (currentPlan) {
-              await ApiClient.updatePlan(currentPlan.plan_id, currentRawData);
-              setCurrentPlan({ ...currentPlan, raw_data: currentRawData });
+            const results = await ApiClient.generateBatch(patientData, batchItems, localRawData);
+            localRawData = { ...localRawData, ...results };
+            if (localCurrentPlan) {
+              localCurrentPlan = await ApiClient.updatePlan(localCurrentPlan.plan_id, localRawData);
             } else {
-               const newPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, currentRawData);
-               setCurrentPlan(newPlan);
+              localCurrentPlan = await ApiClient.createPlan(TARGET_PATIENT_ID, localRawData);
             }
+            setCurrentPlan(localCurrentPlan);
           }
+          toggleGenerating(node.id, false);
         }
       }
-      
       alert('すべての生成が完了しました！');
-
     } catch (error) {
       console.error('Batch generation failed:', error);
       alert('一括生成中にエラーが発生しました。中断します。');
     } finally {
-      setGeneratingCardId(null);
+      // 念のため全クリア
+      setGeneratingIds(new Set());
     }
   };
 
@@ -405,32 +413,18 @@ const RightPanel: React.FC = () => {
   };
 
   const handleSaveGroup = (group: PlanGroup) => {
-    // グループ情報の更新
-    setPlanStructure(prev => prev.map(node => {
-      if (node.id === group.id && node.type === 'group') {
-        return group;
-      }
-      return node;
-    }));
+    setPlanStructure(prev => prev.map(node => node.id === group.id ? group : node));
     setIsGroupModalOpen(false);
     setEditingGroup(null);
-    saveStructureToStorage(); // 保存
+    saveStructureToStorage();
   };
 
   const handleDeleteGroup = (groupId: string) => {
     const group = planStructure.find(n => n.id === groupId);
     if (!group || group.type !== 'group') return;
-
-    if (group.children.length > 0) {
-      if (!window.confirm(`グループ「${group.title}」には ${group.children.length} 個のパネルが含まれています。\n削除すると中のパネルもすべて削除されます。\n本当によろしいですか？`)) {
-        return;
-      }
-    } else {
-      if (!window.confirm(`グループ「${group.title}」を削除しますか？`)) return;
-    }
-
+    if (group.children.length > 0 && !window.confirm(`グループ内のパネルも削除されますがよろしいですか？`)) return;
     setPlanStructure(prev => prev.filter(n => n.id !== groupId));
-    saveStructureToStorage(); // 保存
+    saveStructureToStorage();
   };
 
   const handleTextUpdate = (key: string, val: string) => {
@@ -443,7 +437,7 @@ const RightPanel: React.FC = () => {
     await ApiClient.updatePlan(currentPlan.plan_id, { ...currentPlan.raw_data, [key]: val });
   };
 
-  // Drag & Drop Handlers (Updated for Groups)
+  // Drag & Drop Handlers
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveId(active.id as string);
@@ -451,28 +445,20 @@ const RightPanel: React.FC = () => {
     if (found) setActiveItem(found.node);
   };
 
-  // コンテナ間移動ロジック
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
-    if (active.id === over.id) return;
+    if (!over || active.id === over.id) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const activeInfo = findNode(active.id as string, planStructure);
+    const overInfo = findNode(over.id as string, planStructure);
 
-    const activeInfo = findNode(activeId, planStructure);
-    const overInfo = findNode(overId, planStructure);
+    if (!activeInfo) return; 
 
-    if (!activeInfo) return; // Active must exist
+    if (activeInfo.node.type === 'group') return; // グループ自体のネストは禁止
 
-    // Item以外（つまりGroup）を他のコンテナに混ぜることは今回は禁止（ルート並べ替えのみ）
-    if (activeInfo.node.type === 'group') return;
-
-    // 現在の親
     const activeParentId = activeInfo.parent ? activeInfo.parent.id : 'root';
-    
-    // 移動先の親を特定
     let overParentId = 'root';
+    
     if (overInfo) {
       if (overInfo.node.type === 'group') {
         // グループの上にドラッグ -> そのグループの中へ
@@ -481,21 +467,17 @@ const RightPanel: React.FC = () => {
         // アイテムの上にドラッグ -> そのアイテムと同じ親へ
         overParentId = overInfo.parent ? overInfo.parent.id : 'root';
       }
-    } else {
-       // overInfoがない（空のSortableContext領域など）場合はrootとみなす
-       overParentId = 'root'; 
     }
 
     // 異なるコンテナへの移動の場合のみ処理
     if (activeParentId !== overParentId) {
       setPlanStructure((prev) => {
-        // Deep copy
         const next = JSON.parse(JSON.stringify(prev)) as PlanStructure;
-
-        // 1. 古い親から削除
         let itemToMove: PlanItem | null = null;
+        
+        // Remove
         if (activeParentId === 'root') {
-          const idx = next.findIndex(n => n.id === activeId);
+          const idx = next.findIndex(n => n.id === active.id);
           if (idx !== -1) {
              itemToMove = next[idx] as PlanItem;
              next.splice(idx, 1);
@@ -503,7 +485,7 @@ const RightPanel: React.FC = () => {
         } else {
           const group = next.find(n => n.id === activeParentId) as PlanGroup;
           if (group) {
-             const idx = group.children.findIndex(c => c.id === activeId);
+             const idx = group.children.findIndex(c => c.id === active.id);
              if (idx !== -1) {
                itemToMove = group.children[idx];
                group.children.splice(idx, 1);
@@ -513,18 +495,15 @@ const RightPanel: React.FC = () => {
 
         if (!itemToMove) return prev;
 
-        // 2. 新しい親に追加
+        // Add
         if (overParentId === 'root') {
-           // Rootへ移動
-           const overIdx = next.findIndex(n => n.id === overId);
-           // overが見つからない(group等)場合は末尾、見つかればその位置
+           const overIdx = next.findIndex(n => n.id === over.id);
            const insertIdx = overIdx >= 0 ? overIdx : next.length; 
            next.splice(insertIdx, 0, itemToMove);
         } else {
-           // Groupへ移動
            const group = next.find(n => n.id === overParentId) as PlanGroup;
            if (group) {
-             const overIdx = group.children.findIndex(c => c.id === overId);
+             const overIdx = group.children.findIndex(c => c.id === over.id);
              const insertIdx = overIdx >= 0 ? overIdx : group.children.length;
              group.children.splice(insertIdx, 0, itemToMove);
            }
@@ -540,7 +519,6 @@ const RightPanel: React.FC = () => {
     setActiveItem(null);
 
     if (!over) return;
-    // if (active.id === over.id) return;
 
     const activeInfo = findNode(active.id as string, planStructure);
     const overInfo = findNode(over.id as string, planStructure);
@@ -558,16 +536,13 @@ const RightPanel: React.FC = () => {
             setPlanStructure((items) => arrayMove(items, oldIndex, newIndex));
           }
       } else {
-          // グループ内での並べ替え
           setPlanStructure((prev) => {
              const next = [...prev];
              const groupIndex = next.findIndex(n => n.id === activeParentId);
-        if (groupIndex !== -1) {
+             if (groupIndex !== -1) {
                 const group = { ...next[groupIndex] } as PlanGroup;
                 const oldIndex = activeInfo.index;
-                // findNodeのindexはchildren配列内のindexなのでそのまま使える
                 const newIndex = group.children.findIndex(c => c.id === over.id);
-                
                 if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
                    group.children = arrayMove(group.children, oldIndex, newIndex);
                    next[groupIndex] = group;
@@ -577,30 +552,24 @@ const RightPanel: React.FC = () => {
           });
       }
     }
-    
-    // 状態確定後に保存
     saveStructureToStorage();
   };
 
-  // Config Logic (Add Group)
-
-  // グループ追加処理
   const handleCreateGroup = () => {
     const newGroup: PlanGroup = {
-      id: `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ユニーク性を強化
+      id: `group_${Date.now()}`, 
       type: 'group',
       title: '新しいグループ',
       children: [],
       isCollapsed: false
     };
-    
     setPlanStructure([...planStructure, newGroup]);
     saveStructureToStorage();
   };
 
   const openNewItemModal = () => {
     setEditingItem({
-      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ユニーク性を強化
+      id: `custom_${Date.now()}`, 
       type: 'item',
       title: '新規パネル',
       description: '',
@@ -630,7 +599,6 @@ const RightPanel: React.FC = () => {
     if (!updated) {
       newStructure = [...newStructure, item];
     }
-    
     setPlanStructure(newStructure);
     setIsEditModalOpen(false);
     saveStructureToStorage();
@@ -639,9 +607,7 @@ const RightPanel: React.FC = () => {
   const handleDeleteItem = (id: string) => {
      if(!window.confirm('削除しますか？')) return;
      const deleteRecursive = (list: PlanStructure): PlanStructure => {
-        return list
-          .filter(node => node.id !== id)
-          .map(node => {
+        return list.filter(node => node.id !== id).map(node => {
              if(node.type === 'group') {
                return { ...node, children: deleteRecursive(node.children) };
              }
@@ -653,13 +619,14 @@ const RightPanel: React.FC = () => {
      saveStructureToStorage();
   };
 
-
-  // Render
   const rootIds = useMemo(() => planStructure.map(n => n.id), [planStructure]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc', borderLeft: '1px solid #e2e8f0' }}>
       
+      {/* ぐるぐる用CSS定義 */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+
       {/* Header */}
       <div style={{ padding: '16px', backgroundColor: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4f46e5', display: 'flex', gap: '8px' }}><Sparkles size={20}/> AI Co-Editor</h2>
@@ -684,25 +651,35 @@ const RightPanel: React.FC = () => {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={() => { setActiveId(null); setActiveItem(null); }}
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         >
           <SortableContext items={rootIds} strategy={verticalListSortingStrategy}>
             {planStructure.map(node => {
               if (node.type === 'group') {
                 return (
-                  <SortablePlanGroup key={node.id} group={node as PlanGroup} isGenerating={generatingCardId === node.id} onEdit={handleEditGroup} onDelete={handleDeleteGroup}>
+                  <SortablePlanGroup 
+                    key={node.id} 
+                    group={node as PlanGroup} 
+                    isGenerating={generatingIds.has(node.id)}
+                    onEdit={handleEditGroup} 
+                    onDelete={handleDeleteGroup}
+                    activeId={activeId}
+                  >
                     <SortableContext items={node.children.map(c => c.id)} strategy={verticalListSortingStrategy}>
                        {node.children.map(child => (
                          <SortablePlanItem 
                            key={child.id} 
                            item={child}
                            onGenerate={handleGenerate}
-                           generatingId={generatingCardId}
+                           isGenerating={generatingIds.has(child.id)}
                            onEdit={(itm) => { setEditingItem(itm); setIsEditModalOpen(true); }}
                            currentPlanData={currentPlan?.raw_data || {}}
                            onTextUpdate={handleTextUpdate}
                            onTextBlur={handleTextBlur}
+                           activeId={activeId}
                          />
                        ))}
+                       {node.children.length === 0 && <div style={{ height: '40px', border: '1px dashed #e2e8f0', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '0.8rem' }}>ここにパネルをドロップ</div>}
                     </SortableContext>
                   </SortablePlanGroup>
                 );
@@ -712,11 +689,12 @@ const RightPanel: React.FC = () => {
                     key={node.id} 
                     item={node as PlanItem}
                     onGenerate={handleGenerate}
-                    generatingId={generatingCardId}
+                    isGenerating={generatingIds.has(node.id)}
                     onEdit={(itm) => { setEditingItem(itm); setIsEditModalOpen(true); }}
                     currentPlanData={currentPlan?.raw_data || {}}
                     onTextUpdate={handleTextUpdate}
                     onTextBlur={handleTextBlur}
+                    activeId={activeId}
                   />
                 );
               }
@@ -725,15 +703,16 @@ const RightPanel: React.FC = () => {
           
           <DragOverlay dropAnimation={defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } })}>
              {activeItem && activeItem.type === 'item' ? (
-                <div style={{ opacity: 0.8 }}>
+                <div style={{ opacity: 0.9 }}>
                    <ItemCard 
                      item={activeItem as PlanItem} 
-                     currentText="" isGenerating={false} 
+                     currentText={currentPlan?.raw_data?.[(activeItem as PlanItem).targetKey] || ''} 
+                     isGenerating={false} 
                      onGenerate={()=>{}} onEdit={()=>{}} onTextChange={()=>{}} onTextBlur={()=>{}} 
                    />
                 </div>
              ) : activeItem && activeItem.type === 'group' ? (
-                <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                <div style={{ padding: '12px', background: '#f1f5f9', borderRadius: '12px', border: '1px dashed #cbd5e1', opacity: 0.9 }}>
                   <strong>{(activeItem as PlanGroup).title}</strong>
                 </div>
              ) : null}
@@ -752,11 +731,10 @@ const RightPanel: React.FC = () => {
       </div>
 
       {/* Edit Modal (Item) */}
-{isEditModalOpen && editingItem && (
+      {isEditModalOpen && editingItem && (
         <div style={{ position: 'fixed', top:0, left:0, right:0, bottom:0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
            <div style={{ background: 'white', padding: '24px', borderRadius: '12px', width: '450px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
               
-              {/* Header with Close Button */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ fontWeight: 'bold', fontSize: '1.1rem', margin: 0 }}>パネル設定</h3>
                 <button onClick={() => setIsEditModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
@@ -764,7 +742,6 @@ const RightPanel: React.FC = () => {
                 </button>
               </div>
 
-              {/* 2カラムレイアウト (タイトル & 出力セル) */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                  <label style={labelStyle}>タイトル
                    <input value={editingItem.title} onChange={e => setEditingItem({...editingItem, title: e.target.value})} style={inputStyle} placeholder="タイトル"/>
