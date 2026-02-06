@@ -1,0 +1,12 @@
+transformers
+torch
+fugashi
+ipadic
+spacy
+ja-ginza
+pandas
+tabulate
+requests
+onnx
+optimum[onnxruntime]
+accelerate
