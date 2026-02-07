@@ -10,14 +10,34 @@ class PatientBase(BaseModel):
     gender: Optional[str] = None
     diagnosis_code: Optional[str] = None
     admission_date: Optional[date] = None
+    
+    onset_date: Optional[date] = None
+    outcome: Optional[str] = None
+    total_fim_admission: Optional[int] = None
+    total_fim_discharge: Optional[int] = None
+    
+    # ONNXスコア
+    mental_min: Optional[float] = None
+    mental_mean: Optional[float] = None
+    mental_std: Optional[float] = None
+    physical_mean: Optional[float] = None
+    
+    # 正解データ (Plan text)
+    plan_text: Optional[str] = None
 
 class PatientCreate(PatientBase):
     # 作成時はハッシュIDが必須
     hash_id: str
+    # ベクトルはList[float]で受け取る（任意）
+    social_vector: Optional[List[float]] = None
 
 class PatientRead(PatientBase):
     hash_id: str
     synced_at: datetime
+    
+    # ベクトルデータはサイズが大きいので、通常リスト表示では含めないことが多いが、
+    # 必要ならここで定義する (今回は省略またはOptional)
+    # social_vector: Optional[List[float]] = None 
 
     model_config = ConfigDict(from_attributes=True)
 

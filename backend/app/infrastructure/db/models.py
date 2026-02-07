@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional, List, Any
 
-from sqlalchemy import String, Integer, Date, Text, ForeignKey, Index, func
+from sqlalchemy import String, Integer, Date, Text, Float, ForeignKey, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.dialects.postgresql import JSONB
 from pgvector.sqlalchemy import Vector
@@ -15,19 +15,45 @@ class Base(DeclarativeBase):
 # ----------------------------------------------------------------
 class PatientsView(Base):
     """
-    電子カルテから連携される患者属性情報。
+    電子カルテから連携・加工された患者属性および特徴量データ。
+    RAGの検索ソース（Source）およびLightGBMの推論ソースとして機能する。
     個人特定情報(PHI)は持たず、ハッシュIDで管理する。
     """
     __tablename__ = "patients_view"
 
+    # ID管理
     # プライバシー保護のため実IDではなくハッシュIDをPKとする
     hash_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
     
+    # 基本情報 (Basic Info)
     age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     gender: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     diagnosis_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="ICD-10等の疾患コード")
     admission_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True)
+    onset_date: Mapped[Optional[datetime.date]] = mapped_column(Date, nullable=True, comment="発症日")
+    outcome: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="転帰（自宅復帰/転院など）")
+
+    # 評価データ (Assessment Data)
+    # SQLによる絞り込み(Hard Filter)に使用
+    total_fim_admission: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="入院時FIM合計")
+    total_fim_discharge: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="退院時FIM合計")
     
+    # ONNX / NLP Computed Scores (Feature Engineering)
+    # 日々の記録から算出された統計的特徴量。LightGBMや検索の重み付けに使用。
+    mental_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="ONNX: メンタル最大リスク(Min)")
+    mental_mean: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="ONNX: 平均意欲スコア(Mean)")
+    mental_std: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="ONNX: 情緒のブレ(Std)")
+    physical_mean: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="ONNX: 身体状態スコア(Mean)")
+
+    # Vectors (Embedding)
+    # 社会背景（HOPE, 職業, 家族構成）をベクトル化したもの (768次元)
+    # RAGのStep 2 (Soft Rerank) で使用
+    social_vector: Mapped[Optional[List[float]]] = mapped_column(Vector(768), nullable=True)
+
+    # Reference Data
+    # 過去に実際に作成された計画書の正解テキスト（参照用）
+    plan_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="過去の計画書正解データ")
+
     # 監査用タイムスタンプ
     synced_at: Mapped[datetime.datetime] = mapped_column(
         default=func.now(), onupdate=func.now(), comment="中間DBへの同期日時"
@@ -36,6 +62,18 @@ class PatientsView(Base):
     # Relationships
     plans: Mapped[List["PlanDataStore"]] = relationship(back_populates="patient", cascade="all, delete-orphan")
     documents: Mapped[List["DocumentsView"]] = relationship(back_populates="patient", cascade="all, delete-orphan")
+
+    # Indexes for Fast Search
+    __table_args__ = (
+        # 社会背景ベクトルの類似度検索用インデックス (HNSW)
+        Index(
+            "ix_patients_social_vector",
+            "social_vector",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"social_vector": "vector_l2_ops"}
+        ),
+    )
 
 
 # ----------------------------------------------------------------
@@ -84,7 +122,7 @@ class DocumentsView(Base):
     summary_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="LLMコンテキスト用の要約")
     original_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="参照用の原文（匿名化済み）")
 
-    # --- Hybrid CLEAR Search Core Columns ---
+    # Hybrid CLEAR Search Core Columns
     
     # 1. 構造化タグ (Hard Filter用)
     # 例: {"diagnosis": ["脳梗塞"], "symptoms": ["右片麻痺", "失語症"], "fim_motor": 35}

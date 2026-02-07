@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 import os
+import random  # 【追加】ベクトル生成用
 from datetime import date
 import json
 
@@ -85,6 +86,10 @@ def create_extraction_data(
         "signature": {}
     }
 
+# ダミーベクトル生成関数
+def generate_dummy_vector(dim=768):
+    return [random.random() for _ in range(dim)]
+
 # ==========================================
 # 投入データ定義
 # ==========================================
@@ -96,6 +101,15 @@ DUMMY_PATIENTS = [
         "diagnosis_code": "I63.9",
         "admission_date": date(2026, 4, 1),
         "desc": "脳梗塞・標準",
+        
+        # 新カラム用のデータ
+        "onset_date": date(2026, 3, 25),
+        "outcome": "自宅復帰",
+        "total_fim_admission": 55,
+        "total_fim_discharge": 85,
+        "mental_min": -0.2, "mental_mean": 0.5, "mental_std": 0.1, "physical_mean": -0.8,
+        "plan_text": "【長期目標】妻の介助のもと、自宅での生活が可能となる。\n【短期目標】杖歩行が見守りで可能となる。",
+
         "extraction_data": create_extraction_data(
             name="田中 太郎", age=82, gender="男", 
             diagnosis="脳梗塞 (右片麻痺)", fim_motor=35, fim_cog=25
@@ -108,6 +122,14 @@ DUMMY_PATIENTS = [
         "diagnosis_code": "S72.00",
         "admission_date": date(2026, 4, 10),
         "desc": "大腿骨骨折・認知症なし",
+        
+        "onset_date": date(2026, 4, 9),
+        "outcome": "自宅復帰",
+        "total_fim_admission": 95,
+        "total_fim_discharge": 115,
+        "mental_min": 0.1, "mental_mean": 0.9, "mental_std": 0.05, "physical_mean": -0.4,
+        "plan_text": "【長期目標】受傷前と同じレベルで家事が可能となる。\n【短期目標】独歩で屋内移動が自立する。",
+
         "extraction_data": create_extraction_data(
             name="鈴木 花子", age=75, gender="女", 
             diagnosis="左大腿骨頸部骨折", fim_motor=60, fim_cog=35
@@ -120,6 +142,14 @@ DUMMY_PATIENTS = [
         "diagnosis_code": "I61.9",
         "admission_date": date(2026, 3, 20),
         "desc": "脳出血・失語症",
+
+        "onset_date": date(2026, 3, 15),
+        "outcome": "施設入所",
+        "total_fim_admission": 35,
+        "total_fim_discharge": 50,
+        "mental_min": -0.9, "mental_mean": -0.3, "mental_std": 0.8, "physical_mean": -0.5,
+        "plan_text": "【長期目標】施設にて車椅子での離床時間を確保できる。\n【短期目標】移乗動作が中等度介助レベルとなる。",
+
         "extraction_data": create_extraction_data(
             name="佐藤 次郎", age=68, gender="男", 
             diagnosis="左被殻出血 (右片麻痺・失語)", fim_motor=20, fim_cog=15
@@ -136,10 +166,12 @@ async def seed_patients():
     async with AsyncSessionLocal() as session:
         for p_data in DUMMY_PATIENTS:
             # 1. PatientsView (基本情報) のUpsert
-            # 既存があれば取得、なければ作成
             stmt = select(PatientsView).where(PatientsView.hash_id == p_data["hash_id"])
             result = await session.execute(stmt)
             patient = result.scalars().first()
+
+            # ダミーベクトルの生成
+            dummy_social_vector = generate_dummy_vector(768)
 
             if not patient:
                 patient = PatientsView(
@@ -147,22 +179,37 @@ async def seed_patients():
                     age=p_data["age"],
                     gender=p_data["gender"],
                     diagnosis_code=p_data["diagnosis_code"],
-                    admission_date=p_data["admission_date"]
+                    admission_date=p_data["admission_date"],
+                    # 新カラムへの値セット
+                    onset_date=p_data["onset_date"],
+                    outcome=p_data["outcome"],
+                    total_fim_admission=p_data["total_fim_admission"],
+                    total_fim_discharge=p_data["total_fim_discharge"],
+                    mental_min=p_data["mental_min"],
+                    mental_mean=p_data["mental_mean"],
+                    mental_std=p_data["mental_std"],
+                    physical_mean=p_data["physical_mean"],
+                    social_vector=dummy_social_vector,
+                    plan_text=p_data["plan_text"]
                 )
                 session.add(patient)
                 logger.info(f"[Patient] Created: {p_data['hash_id']} ({p_data['desc']})")
             else:
-                logger.info(f"[Patient] Exists: {p_data['hash_id']}")
+                # 更新時も新しい値を入れる（必要なら）
+                patient.social_vector = dummy_social_vector
+                patient.plan_text = p_data["plan_text"]
+                logger.info(f"[Patient] Exists (Updated vector/text): {p_data['hash_id']}")
             
             # 2. DocumentsView (詳細データ) のUpsert
-            # "latest_state" というタイプのドキュメントとして保存する
-            # まず既存の latest_state を削除（更新のため）
             stmt_doc = delete(DocumentsView).where(
                 (DocumentsView.hash_id == p_data["hash_id"]) & 
                 (DocumentsView.doc_type == "latest_state")
             )
             await session.execute(stmt_doc)
             
+            # 本文用ダミーベクトル
+            dummy_content_vector = generate_dummy_vector(768)
+
             # バリデーションチェック (Pydantic)
             try:
                 # 辞書データをPydanticモデルに通して整合性チェック
@@ -176,7 +223,9 @@ async def seed_patients():
                     doc_type="latest_state",
                     source_type="SEED",
                     summary_text="初期シードデータによる現在の患者状態",
-                    entities=valid_json_data  # ここにJSON丸ごと格納
+                    entities=valid_json_data,
+                    # ベクトルをセット
+                    content_vector=dummy_content_vector
                 )
                 session.add(new_doc)
                 logger.info(f"[Document] Inserted latest_state for {p_data['hash_id']}")
@@ -192,4 +241,6 @@ if __name__ == "__main__":
         asyncio.run(seed_patients())
     except Exception as e:
         logger.error(f"Seeding failed: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)

@@ -1,11 +1,13 @@
-from sqlalchemy import select
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
+
 from app.infrastructure.db.models import PatientsView, DocumentsView
 from app.schemas.schemas import PatientCreate
 
 class PatientRepository:
     """
-    患者データ (PatientsView) へのアクセスを担当するクラス
+    患者データ (PatientsView) へのアクセスおよび検索を担当するクラス
     """
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -22,7 +24,13 @@ class PatientRepository:
             age=patient.age,
             gender=patient.gender,
             diagnosis_code=patient.diagnosis_code,
-            admission_date=patient.admission_date
+            admission_date=patient.admission_date,
+            # 追加カラム
+            onset_date=patient.onset_date,
+            outcome=patient.outcome,
+            total_fim_admission=patient.total_fim_admission,
+            mental_min=patient.mental_min,
+            social_vector=patient.social_vector
         )
         
         # DBに追加してコミット
@@ -71,7 +79,7 @@ class PatientRepository:
 
     async def get_latest_state(self, hash_id: str) -> dict | None:
         """
-        指定された患者の最新の状態（doc_type='latest_state'）のentitiesデータを取得する。
+        指定された患者の最新の状態（entities）を取得する。
         """
         print(f"[PatientRepository] Fetching latest state for: {hash_id}")
         
@@ -88,3 +96,66 @@ class PatientRepository:
         
         print(f"[PatientRepository] No latest state found for {hash_id}")
         return None
+
+    # -------------------------------------------------------
+    # Hybrid Search Implementation (SQL + Vector)
+    # -------------------------------------------------------
+    async def search_similar_patients(
+        self, 
+        target_vector: List[float], 
+        filters: dict, 
+        limit: int = 3
+    ) -> List[PatientsView]:
+        """
+        Hybrid Searchを実行し、類似患者を返却します。
+        
+        Args:
+            target_vector: 検索対象(ターゲット患者)の社会背景ベクトル
+            filters: SQLで絞り込むための条件 (diagnosis_code, age_range, fim_range等)
+            limit: 取得件数
+        
+        Returns:
+            類似度の高い順にソートされたPatientsViewのリスト
+        """
+        print(f"[PatientRepository] executing Hybrid Search with filters: {filters}")
+
+        # 1. Base Query
+        stmt = select(PatientsView)
+        
+        conditions = []
+        
+        # 2. Hard Filters (SQL)
+        # 疾患コードの一致（前方一致など、要件に合わせて調整）
+        if "diagnosis_code" in filters and filters["diagnosis_code"]:
+            # 例: I63.9 -> I63 (カテゴリ一致)
+            code_prefix = filters["diagnosis_code"][:3] 
+            conditions.append(PatientsView.diagnosis_code.startswith(code_prefix))
+        
+        # 年齢フィルタ (±10歳)
+        if "age" in filters and filters["age"]:
+            target_age = filters["age"]
+            conditions.append(PatientsView.age.between(target_age - 10, target_age + 10))
+
+        # FIMフィルタ (±15点)
+        if "total_fim_admission" in filters and filters["total_fim_admission"]:
+            target_fim = filters["total_fim_admission"]
+            conditions.append(PatientsView.total_fim_admission.between(target_fim - 15, target_fim + 15))
+
+        # フィルタ適用
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+
+        # 3. Soft Rerank (Vector Similarity)
+        # pgvectorの L2 distance ( <-> 演算子 ) または cosine distance ( <=> ) を使用
+        # 近い順（距離が小さい順）にソート
+        if target_vector:
+            stmt = stmt.order_by(PatientsView.social_vector.l2_distance(target_vector))
+        
+        stmt = stmt.limit(limit)
+
+        # 実行
+        result = await self.db.execute(stmt)
+        similar_patients = result.scalars().all()
+        
+        print(f"[PatientRepository] Found {len(similar_patients)} similar patients.")
+        return similar_patients
