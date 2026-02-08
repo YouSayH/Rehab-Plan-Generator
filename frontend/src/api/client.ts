@@ -1,10 +1,16 @@
-import { PatientExtractionData, PlanRead } from './types';
+import { PatientExtractionData, PlanRead, PatientRead } from './types';
 
 // 環境に合わせてURLを変更してください
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 export const ApiClient = {
-  // 計画書生成 (AI全自動生成)
+  getPatients: async (): Promise<PatientRead[]> => {
+    const response = await fetch(`${API_BASE_URL}/patients/`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch patients: ${response.statusText}`);
+    }
+    return response.json();
+  },
   generatePlan: async (hashId: string, patientData: PatientExtractionData): Promise<PlanRead> => {
     const response = await fetch(`${API_BASE_URL}/plans/generate/${hashId}`, {
       method: 'POST',

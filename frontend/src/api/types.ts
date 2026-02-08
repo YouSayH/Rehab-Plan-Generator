@@ -4,6 +4,15 @@
 // Patient Extraction Data Types
 // ==========================================
 
+// 患者一覧取得用の型定義
+export interface PatientRead {
+  hash_id: string;
+  name?: string;
+  age?: number;
+  gender?: string;
+  diagnosis_code?: string;
+}
+
 export interface BasicInfo {
   name: string | null;
   age: number | null;

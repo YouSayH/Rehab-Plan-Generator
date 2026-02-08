@@ -1,7 +1,7 @@
 // frontend/src/features/dashboard/PlanContext.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { PlanRead, PatientExtractionData, PlanStructure, stringifyCellAddress, CELL_MAPPING } from '../../api/types';
-
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { PlanRead, PatientExtractionData, PlanStructure, stringifyCellAddress, CELL_MAPPING, PatientRead } from '../../api/types';
+import { ApiClient } from '../../api/client';
 
 // デフォルトのパネル設定（階層構造）
 const DEFAULT_PLAN_STRUCTURE: PlanStructure = [
@@ -53,6 +53,12 @@ interface PlanContextType {
   currentPlan: PlanRead | null;
   setCurrentPlan: (plan: PlanRead) => void;
 
+  // 患者選択機能
+  patientList: PatientRead[];
+  currentHashId: string | null;
+  setCurrentHashId: (hashId: string) => void;
+  loadPatientList: () => Promise<void>;
+
   patientData: PatientExtractionData | null;
   setPatientData: (data: PatientExtractionData) => void;
 
@@ -69,16 +75,7 @@ interface PlanContextType {
   saveStructureToStorage: () => void;
 
   // プライバシー保護対応（ハッシュIDと実名のマッピング）
-  /**
-   * ハッシュIDに対応する実名をブラウザ内に登録します。
-   * (計画書生成開始時や、ファイルアップロード時に呼び出してください)
-   */
   registerPatientName: (hashId: string, name: string) => void;
-
-  /**
-   * ハッシュIDから実名を取得します。
-   * (ヘッダー表示時などに使用してください)
-   */
   getPatientName: (hashId: string) => string | null;
 }
 
@@ -88,7 +85,31 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentPlan, setCurrentPlan] = useState<PlanRead | null>(null);
   const [patientData, setPatientData] = useState<PatientExtractionData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // 患者リストと選択IDのState
+  const [patientList, setPatientList] = useState<PatientRead[]>([]);
+  const [currentHashId, setCurrentHashId] = useState<string | null>(null);
   
+  // 患者リスト取得関数 (useCallbackでメモ化)
+  // currentHashIdの更新ロジックを含むため、依存配列は空にして内部でstate setterを使用
+  const loadPatientList = useCallback(async () => {
+    try {
+      const list = await ApiClient.getPatients();
+      setPatientList(list);
+      // リストがあり、未選択なら先頭をデフォルト選択（任意）
+      // Stateの更新関数内で現在の値を確認して更新する
+      // 関数アップデートを使って currentHashId への依存を排除（初期選択ロジック）
+      setCurrentHashId(prev => {
+        if (list.length > 0 && !prev) {
+          return list[0].hash_id;
+        }
+        return prev;
+      });
+    } catch (e) {
+      console.error("Failed to load patient list", e);
+    }
+  }, []);
+
   // パネル構造のState (初期値はデフォルト設定)
   const [planStructure, setPlanStructure] = useState<PlanStructure>(DEFAULT_PLAN_STRUCTURE);
   
@@ -97,6 +118,9 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // 初期ロード時にLocalStorageから復元
   useEffect(() => {
+    // 初回マウント時に患者リストを取得
+    loadPatientList();
+
     // 1. パネル構造の復元
     const savedConfig = localStorage.getItem(STORAGE_KEY_PLAN_STRUCTURE);
     if (savedConfig) {
@@ -114,30 +138,36 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setNameMap(parsed);
       } catch (e) { console.error('Failed to load name map', e); }
     }
-  }, []);
+  }, [loadPatientList]); // loadPatientListを依存に追加
 
-  const saveStructureToStorage = () => {
+  const saveStructureToStorage = useCallback(() => {
     localStorage.setItem(STORAGE_KEY_PLAN_STRUCTURE, JSON.stringify(planStructure));
-  };
+  }, [planStructure]);
 
-  const resetPlanStructure = () => {
+  const resetPlanStructure = useCallback(() => {
     if (window.confirm('パネル設定を初期状態に戻しますか？')) {
       setPlanStructure(DEFAULT_PLAN_STRUCTURE);
       localStorage.removeItem(STORAGE_KEY_PLAN_STRUCTURE);
       localStorage.removeItem('rehab_app_card_config'); // 旧設定削除
     }
-  };
+  }, []);
 
-  // 実名マッピング管理ロジック
-  const registerPatientName = (hashId: string, name: string) => {
-    const newMap = { ...nameMap, [hashId]: name };
-    setNameMap(newMap);
-    localStorage.setItem(STORAGE_KEY_NAME_MAP, JSON.stringify(newMap));
-  };
+  // 実名マッピング管理ロジック (useCallbackでメモ化 + 関数型更新)
+  // nameMapを依存配列から外すことで、この関数の参照を安定させる（無限ループ防止の要）
+  const registerPatientName = useCallback((hashId: string, name: string) => {
+    setNameMap(prev => {
+      // 変更がない場合は更新しない（無駄なレンダリング防止）
+      if (prev[hashId] === name) return prev;
+      
+      const newMap = { ...prev, [hashId]: name };
+      localStorage.setItem(STORAGE_KEY_NAME_MAP, JSON.stringify(newMap));
+      return newMap;
+    });
+  }, []); // 依存配列は空！
 
-  const getPatientName = (hashId: string): string | null => {
+  const getPatientName = useCallback((hashId: string): string | null => {
     return nameMap[hashId] || null;
-  };
+  }, [nameMap]); // nameMapが変わった時のみ再生成
 
   return (
     <PlanContext.Provider value={{ 
@@ -146,7 +176,9 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       isGenerating, setIsGenerating,
       planStructure, setPlanStructure, 
       resetPlanStructure, saveStructureToStorage,
-      registerPatientName, getPatientName
+      registerPatientName, getPatientName,
+      patientList, currentHashId,
+      setCurrentHashId, loadPatientList
     }}>
       {children}
     </PlanContext.Provider>
