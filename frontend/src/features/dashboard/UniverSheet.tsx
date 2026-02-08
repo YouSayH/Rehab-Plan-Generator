@@ -25,6 +25,7 @@ import { CELL_MAPPING, parseCellAddress, CellMapping, PlanStructure, PlanItem } 
 const UniverSheet: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const univerRef = useRef<Univer | null>(null);
+  const workbookRef = useRef<any>(null); 
   
   const [workbookId, setWorkbookId] = useState<string>('');
   const { currentPlan, planStructure } = usePlanContext();
@@ -260,6 +261,7 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
     if (univerRef.current) {
       try { univerRef.current.dispose(); } catch (e) { console.warn(e); }
       univerRef.current = null;
+      workbookRef.current = null;
       if (containerRef.current) containerRef.current.innerHTML = '';
     }
 
@@ -305,6 +307,7 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
 
     const unit = univer.createUnit(UniverInstanceType.UNIVER_SHEET, data);
     setWorkbookId(unit.getUnitId());
+    workbookRef.current = unit; 
     univerRef.current = univer;
   };
 
@@ -316,6 +319,7 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
       if (univerRef.current) {
         try { univerRef.current.dispose(); } catch (e) {}
         univerRef.current = null;
+        workbookRef.current = null;
       }
     };
   }, []);
@@ -359,14 +363,13 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
 
       if (mapping) {
         const { r, c } = mapping;
-        // 反映先のシートIDを決定
-        const activeWorkbook = univerRef.current.getUniverSheetInstance(workbookId || 'workbook-01');
-        // 最初のシートIDを取得（Excel取込後は sheet-0 になるため）
+        const activeWorkbook = workbookRef.current; 
+        // 最初のシートIDを取得
         const targetSheetId = activeWorkbook?.getSheets()[0]?.getSheetId() || 'sheet-01';
 
         commandService.executeCommand(SetRangeValuesCommand.id, {
           unitId: workbookId || 'workbook-01',
-          subUnitId: targetSheetId, // 動的に取得したIDを使用
+          subUnitId: targetSheetId, 
           range: { startRow: r, startColumn: c, endRow: r, endColumn: c },
           value: { v: textValue },
         });
@@ -386,34 +389,59 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
   };
 
   const handleRegisterTemplate = async () => {
-    const name = prompt("テンプレート名:", "新規テンプレート");
-    if (!name || !univerRef.current) return;
-    // @ts-ignore
-    const snapshot = univerRef.current.getUniverSheetInstance(workbookId)?.save();
-    if (snapshot) {
-      try {
-        await ApiClient.saveTemplate(name, snapshot);
-        alert("登録しました");
+    // 1. Workbookインスタンスの存在確認
+    if (!workbookRef.current) {
+        alert("ワークブックが初期化されていません。");
+        return;
+    }
+    
+    const name = prompt("テンプレート名を入力してください:", "新規テンプレート");
+    if (!name) return; // キャンセル
+
+    const description = prompt("テンプレートの説明を入力してください（任意）:", "") || undefined;
+
+    try {
+      // 2. 保持しているインスタンスから直接スナップショットを取得
+      const snapshot = workbookRef.current.getSnapshot();
+
+      if (snapshot) {
+        await ApiClient.saveTemplate(name, snapshot, description);
+        alert("テンプレートを登録しました！");
         loadTemplates();
-      } catch (e) { alert("保存失敗"); }
+      } else {
+        throw new Error("スナップショットが取得できませんでした。");
+      }
+
+    } catch (e: any) {
+      console.error("Template Save Error:", e);
+      alert(`保存に失敗しました。\n詳細: ${e.message || JSON.stringify(e)}`);
     }
   };
 
-  const handleLoadTemplate = async () => {
-    if (!selectedTemplateId) return;
+  const executeLoadTemplate = async (id: string) => {
+    if (!id) return;
     try {
-      const template = await ApiClient.getTemplate(Number(selectedTemplateId));
+      const template = await ApiClient.getTemplate(Number(id));
       if (template.data) initUniver(template.data);
     } catch (e) { alert("読込失敗"); }
   };
 
-const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ボタンクリック時は、現在選択されているID (selectedTemplateId) を使用
+  const handleLoadTemplate = () => executeLoadTemplate(selectedTemplateId);
+
+  // プルダウン変更時は、新しいIDですぐに読み込みを実行
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    setSelectedTemplateId(newId);
+    executeLoadTemplate(newId);
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsLoading(true);
 
     try {
-      // ★ ここで ExcelJS を動的にインポート
       const ExcelJSModule = await import('exceljs');
       const ExcelJS = ExcelJSModule.default || ExcelJSModule; // CJS/ESM互換用
 
@@ -461,8 +489,8 @@ const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '8px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'center' }}>
         <strong>Canvas</strong>
-        <select value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px' }}>
-          <option value="">-- テンプレート --</option>
+        <select value={selectedTemplateId} onChange={handleTemplateChange} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px' }}>
+          <option value="">-- テンプレートを選択 --</option>
           {templates.map(t => <option key={t.template_id} value={t.template_id}>{t.name}</option>)}
         </select>
         <button onClick={handleLoadTemplate} disabled={!selectedTemplateId} style={btnStyle}><Download size={14} /> 読込</button>
@@ -472,7 +500,13 @@ const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
           Excel取込
           <input type="file" accept=".xlsx" onChange={handleImportExcel} style={{ display: 'none' }} disabled={isLoading} />
         </label>
-        <button onClick={handleRegisterTemplate} style={{ ...btnStyle, background: '#4f46e5', color: '#fff', border:'none' }}><Save size={14} /> 登録</button>
+        {/* ボタンラベル変更と右寄せ(marginLeft: auto)を追加 */}
+        <button 
+          onClick={handleRegisterTemplate} 
+          style={{ ...btnStyle, background: '#4f46e5', color: '#fff', border:'none', marginLeft: 'auto' }}
+        >
+          <Save size={14} /> 現在の状態をテンプレートとして保存
+        </button>
       </div>
       <div ref={containerRef} style={{ flex: 1, overflow: 'hidden' }} />
     </div>
