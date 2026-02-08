@@ -16,7 +16,7 @@ import { UniverUIPlugin } from '@univerjs/ui';
 
 // @ts-ignore
 import ExcelJS from 'exceljs';
-import { Save, FileSpreadsheet, Download, RefreshCw } from 'lucide-react';
+import { Save, FileSpreadsheet, Download, RefreshCw, FileDown } from 'lucide-react';
 
 import { usePlanContext } from './PlanContext';
 import { ApiClient, TemplateRead } from '../../api/client';
@@ -485,6 +485,87 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
       e.target.value = '';
     }
   };
+
+  const handleDownloadExcel = async () => {
+    if (!workbookRef.current) return;
+
+    try {
+      const ExcelJSModule = await import('exceljs');
+      const ExcelJS = ExcelJSModule.default || ExcelJSModule;
+      const workbook = new ExcelJS.Workbook();
+      
+      // 現在のデータを取得
+      const snapshot = workbookRef.current.getSnapshot();
+
+      // 各シートをループしてExcelJSに追加
+      // @ts-ignore
+      Object.keys(snapshot.sheets).forEach((sheetId) => {
+        const sheetData = snapshot.sheets[sheetId];
+        const worksheet = workbook.addWorksheet(sheetData.name || 'Sheet1');
+
+        // 1. セルデータの書き出し
+        if (sheetData.cellData) {
+          Object.keys(sheetData.cellData).forEach((rowKey) => {
+            const r = parseInt(rowKey);
+            const rowData = sheetData.cellData[rowKey];
+            Object.keys(rowData).forEach((colKey) => {
+              const c = parseInt(colKey);
+              const cell = rowData[colKey];
+              
+              if (cell && (cell.v !== null && cell.v !== undefined)) {
+                // ExcelJSは 1-based index
+                const excelCell = worksheet.getCell(r + 1, c + 1);
+                excelCell.value = cell.v;
+                
+                // ※注: ここで cell.s (スタイル) を逆変換して excelCell に適用すれば
+                // 色やフォントもエクスポート可能ですが、記述量が多いため今回は「値と結合」のみ実装します
+              }
+            });
+          });
+        }
+
+        // 2. 結合セルの適用
+        if (sheetData.mergeData) {
+          sheetData.mergeData.forEach((merge: any) => {
+            // Univer: 0-based { startRow, endRow, startColumn, endColumn }
+            // ExcelJS: 1-based, top, left, bottom, right
+            worksheet.mergeCells(
+              merge.startRow + 1,
+              merge.startColumn + 1,
+              merge.endRow + 1,
+              merge.endColumn + 1
+            );
+          });
+        }
+        
+        // 3. 列幅の簡易適用 (任意)
+        if (sheetData.columnData) {
+           Object.keys(sheetData.columnData).forEach((colKey) => {
+             const c = parseInt(colKey);
+             const width = sheetData.columnData[colKey].w;
+             if (width) {
+               worksheet.getColumn(c + 1).width = width / 7; // 簡易換算
+             }
+           });
+        }
+      });
+
+      // ブラウザでダウンロード発火
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `plan_${new Date().toISOString().slice(0,10)}.xlsx`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+
+    } catch (e) {
+      console.error(e);
+      alert("ダウンロードに失敗しました");
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '8px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -500,6 +581,9 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
           Excel取込
           <input type="file" accept=".xlsx" onChange={handleImportExcel} style={{ display: 'none' }} disabled={isLoading} />
         </label>
+        <button onClick={handleDownloadExcel} style={btnStyle}>
+          <FileDown size={14} /> Excel出力
+        </button>
         {/* ボタンラベル変更と右寄せ(marginLeft: auto)を追加 */}
         <button 
           onClick={handleRegisterTemplate} 
