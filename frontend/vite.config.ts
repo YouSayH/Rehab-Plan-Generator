@@ -17,17 +17,12 @@ export default defineConfig({
       }
     }
   },
-  // 1. 開発サーバー (npm run dev) の高速化
+  // 1. 開発サーバー (npm run dev) の設定
   optimizeDeps: {
-    // 【重要】exclude を削除し、逆に include に加えるか、Viteの自動検出に任せます。
-    // これにより、巨大なUniverライブラリが1つのファイルに事前バンドルされ、
-    // ブラウザのリクエスト数が激減して起動が爆速になります。
-    include: [
-      'react', 
-      'react-dom',
-      'react-resizable-panels', 
-      'lucide-react',
-      'luckyexcel',
+    // 【修正】includeではなくexcludeを使用します
+    // UniverJSを事前バンドルから「除外」し、直接ESMとして読み込むことで
+    // 二重読み込みやサービスの競合エラー（Identifier already exists）を防ぎます。
+    exclude: [
       '@univerjs/core',
       '@univerjs/design',
       '@univerjs/engine-render',
@@ -37,7 +32,9 @@ export default defineConfig({
       '@univerjs/docs-ui',
       '@univerjs/sheets',
       '@univerjs/sheets-ui',
-      '@univerjs/sheets-formula'
+      '@univerjs/sheets-formula',
+      '@univerjs/presets',
+      '@univerjs/preset-sheets-core'
     ],
   },
   // 2. 本番ビルド (npm run build) の最適化

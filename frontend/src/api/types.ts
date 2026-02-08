@@ -174,3 +174,30 @@ export type PlanNode = PlanItem | PlanGroup;
  * 全体の構造定義 (Stateとして保持する型)
  */
 export type PlanStructure = PlanNode[];
+
+// ==========================================
+// UI / Configuration Types
+// ==========================================
+
+
+// 値の変換ルール (例: from="true", to="☑")
+export interface ValueMapping {
+  from: string;
+  to: string;
+}
+
+/**
+ * 各データ項目の設定情報
+ */
+export interface FieldConfig {
+  path: string;           // データのパス (例: "medical.hypertension")
+  targetCell: string;     // 出力先セル (例: "C10")
+  mappings: ValueMapping[]; // 汎用的な値変換ルール
+  includeInPrompt: boolean; // プロンプトに含めるかどうか
+}
+
+/**
+ * 全項目の設定マップ
+ * キーはデータのパス (例: "basic.name", "adl.eating.fim_current")
+ */
+export type FieldConfigMap = Record<string, FieldConfig>;

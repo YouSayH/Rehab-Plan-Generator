@@ -1,7 +1,21 @@
 // frontend/src/features/dashboard/PlanContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { PlanRead, PatientExtractionData, PlanStructure, stringifyCellAddress, CELL_MAPPING, PatientRead } from '../../api/types';
+import { PlanRead, PatientExtractionData, PlanStructure, stringifyCellAddress, CELL_MAPPING, PatientRead, FieldConfigMap, FieldConfig } from '../../api/types';
 import { ApiClient } from '../../api/client';
+
+// 簡易的なDeep Cloneと削除関数
+const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj));
+const deleteValue = (obj: any, path: string) => {
+  const parts = path.split('.');
+  let current = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!current[parts[i]]) return;
+    current = current[parts[i]];
+  }
+  if (current && parts.length > 0) {
+    delete current[parts[parts.length - 1]];
+  }
+};
 
 // デフォルトのパネル設定（階層構造）
 const DEFAULT_PLAN_STRUCTURE: PlanStructure = [
@@ -47,6 +61,7 @@ const DEFAULT_PLAN_STRUCTURE: PlanStructure = [
 // ローカルストレージのキー定数
 const STORAGE_KEY_PLAN_STRUCTURE = 'rehab_app_plan_structure';
 const STORAGE_KEY_NAME_MAP = 'rehab_app_patient_name_map';
+const STORAGE_KEY_FIELD_CONFIG = 'rehab_app_field_config_v1';
 
 interface PlanContextType {
   // 生成結果の計画書
@@ -77,6 +92,11 @@ interface PlanContextType {
   // プライバシー保護対応（ハッシュIDと実名のマッピング）
   registerPatientName: (hashId: string, name: string) => void;
   getPatientName: (hashId: string) => string | null;
+
+  // フィールド設定関連
+  fieldConfigs: FieldConfigMap;
+  updateFieldConfig: (path: string, diff: Partial<FieldConfig>) => void;
+  getFilteredPatientData: () => PatientExtractionData | null;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
@@ -110,11 +130,14 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  // パネル構造のState (初期値はデフォルト設定)
+// パネル構造のState (初期値はデフォルト設定)
   const [planStructure, setPlanStructure] = useState<PlanStructure>(DEFAULT_PLAN_STRUCTURE);
   
   // 実名マッピング（メモリ上）
   const [nameMap, setNameMap] = useState<Record<string, string>>({});
+
+  // フィールド設定の状態
+  const [fieldConfigs, setFieldConfigs] = useState<FieldConfigMap>({});
 
   // 初期ロード時にLocalStorageから復元
   useEffect(() => {
@@ -138,11 +161,20 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setNameMap(parsed);
       } catch (e) { console.error('Failed to load name map', e); }
     }
+
+    // 3. フィールド設定の復元
+    const savedFieldConfig = localStorage.getItem(STORAGE_KEY_FIELD_CONFIG);
+    if (savedFieldConfig) {
+      try {
+        setFieldConfigs(JSON.parse(savedFieldConfig));
+      } catch (e) { console.error('Failed to load field config', e); }
+    }
   }, [loadPatientList]); // loadPatientListを依存に追加
 
   const saveStructureToStorage = useCallback(() => {
     localStorage.setItem(STORAGE_KEY_PLAN_STRUCTURE, JSON.stringify(planStructure));
-  }, [planStructure]);
+    localStorage.setItem(STORAGE_KEY_FIELD_CONFIG, JSON.stringify(fieldConfigs)); // 設定も保存
+  }, [planStructure, fieldConfigs]);
 
   const resetPlanStructure = useCallback(() => {
     if (window.confirm('パネル設定を初期状態に戻しますか？')) {
@@ -165,9 +197,44 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   }, []); // 依存配列は空！
 
-  const getPatientName = useCallback((hashId: string): string | null => {
+const getPatientName = useCallback((hashId: string): string | null => {
     return nameMap[hashId] || null;
   }, [nameMap]); // nameMapが変わった時のみ再生成
+
+  // フィールド設定更新関数
+  const updateFieldConfig = useCallback((path: string, diff: Partial<FieldConfig>) => {
+    setFieldConfigs(prev => {
+      const current = prev[path] || { 
+        path, 
+        targetCell: '', 
+        format: 'text', 
+        includeInPrompt: true 
+      };
+      const updated = { ...current, ...diff };
+      return { ...prev, [path]: updated };
+    });
+  }, []);
+
+  // フィルタリングされたPatientDataを取得する関数
+  // includeInPromptがfalseの項目を削除して返します
+  const getFilteredPatientData = useCallback((): PatientExtractionData | null => {
+    if (!patientData) return null;
+    
+    // データ自体がない場合はnull
+    if (Object.keys(fieldConfigs).length === 0) return patientData;
+
+    const filtered = deepClone(patientData);
+
+    // 設定をループして、includeInPromptがfalseのものを削除
+    Object.keys(fieldConfigs).forEach(path => {
+      const config = fieldConfigs[path];
+      if (config.includeInPrompt === false) {
+        deleteValue(filtered, path);
+      }
+    });
+
+    return filtered;
+  }, [patientData, fieldConfigs]);
 
   return (
     <PlanContext.Provider value={{ 
@@ -178,7 +245,8 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       resetPlanStructure, saveStructureToStorage,
       registerPatientName, getPatientName,
       patientList, currentHashId,
-      setCurrentHashId, loadPatientList
+      setCurrentHashId, loadPatientList,
+      fieldConfigs, updateFieldConfig, getFilteredPatientData
     }}>
       {children}
     </PlanContext.Provider>

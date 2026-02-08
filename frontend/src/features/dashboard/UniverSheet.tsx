@@ -20,7 +20,7 @@ import { Save, FileSpreadsheet, Download, RefreshCw, FileDown } from 'lucide-rea
 
 import { usePlanContext } from './PlanContext';
 import { ApiClient, TemplateRead } from '../../api/client';
-import { CELL_MAPPING, parseCellAddress, CellMapping, PlanStructure, PlanItem } from '../../api/types';
+import { CELL_MAPPING, parseCellAddress, CellMapping, PlanStructure, PlanItem, ValueMapping } from '../../api/types';
 
 const UniverSheet: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -28,11 +28,31 @@ const UniverSheet: React.FC = () => {
   const workbookRef = useRef<any>(null); 
   
   const [workbookId, setWorkbookId] = useState<string>('');
-  const { currentPlan, planStructure } = usePlanContext();
+  // インスタンス再生成を検知するためのバージョンキーを追加
+  const [univerVersion, setUniverVersion] = useState(0);
+
+  const { currentPlan, planStructure, fieldConfigs, patientData } = usePlanContext();
   const [templates, setTemplates] = useState<TemplateRead[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // ---------------------------------------------------------------------------
+  // Restore Map & Helpers
+  // ---------------------------------------------------------------------------
+  // 自動入力前の値を保持するマップ (Undo用)
+  // workbookId も保持して、シート切り替え時に履歴が無効であることを検知できるようにする
+  const restoreMapRef = useRef<Map<string, { cellId: string, value: any, workbookId: string }>>(new Map());
+
+  // ユーティリティ: パスから値を取得
+  const getValueByPath = (obj: any, path: string) => path.split('.').reduce((acc, part) => acc && acc[part], obj);
+
+  // ユーティリティ: 値変換
+  const transformValue = (rawValue: any, mappings: ValueMapping[]) => {
+    const strValue = String(rawValue);
+    if (!mappings || mappings.length === 0) return rawValue;
+    const found = mappings.find(m => m.from === strValue || m.from.toLowerCase() === strValue.toLowerCase());
+    return found ? found.to : rawValue;
+  };
 
 // ---------------------------------------------------------------------------
   // 1. ExcelJS -> Univer 変換ロジック (Styles & Data)
@@ -263,6 +283,11 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
       univerRef.current = null;
       workbookRef.current = null;
       if (containerRef.current) containerRef.current.innerHTML = '';
+      
+      // ワークブック切り替え時は復元履歴をクリアする
+      // これをしないと、新しいシートに対して「前のシートの復元値」を適用しようとしたり、
+      // 逆に「既に書き込み済み」と誤判定して書き込まれなかったりします。
+      restoreMapRef.current.clear();
     }
 
     const defaultSnapshot = {
@@ -309,6 +334,9 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
     setWorkbookId(unit.getUnitId());
     workbookRef.current = unit; 
     univerRef.current = univer;
+
+    // バージョンを更新して useEffect を強制発火させる
+    setUniverVersion(v => v + 1);
   };
 
   useEffect(() => {
@@ -379,7 +407,113 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
   }, [currentPlan, planStructure, workbookId]);
 
   // ---------------------------------------------------------------------------
-  // 4. ハンドラ
+  // 4. [NEW] 患者データのリアルタイム反映 & 復元ロジック
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    console.log('[UniverSheet] Data Reflection Effect Triggered', { 
+      workbookId, 
+      univerVersion, // ログに追加
+      hasUniver: !!univerRef.current, 
+      hasWorkbook: !!workbookRef.current,
+      hasPatientData: !!patientData 
+    });
+
+    if (!univerRef.current || !workbookRef.current || !patientData || !fieldConfigs) {
+      console.log('[UniverSheet] Skipping: Missing dependencies');
+      return;
+    }
+
+    // @ts-ignore
+    const commandService = univerRef.current.__getInjector().get(ICommandService);
+    if (!commandService) return;
+
+    const activeWorkbook = workbookRef.current;
+    // workbookIdが変わった直後はアクティブシートが正しく取れない場合があるため、unitIdから取得
+    const sheet = activeWorkbook.getActiveSheet(); 
+    if (!sheet) {
+      console.log('[UniverSheet] Skipping: No active sheet');
+      return;
+    }
+    
+    // 現在のWorkbookIDと一致しているか確認 (タイミング問題の防止)
+    const currentUnitId = activeWorkbook.getUnitId();
+    console.log(`[UniverSheet] ID Check: state=${workbookId}, current=${currentUnitId}`);
+    
+    if (currentUnitId !== workbookId) {
+      console.log(`[UniverSheet] Skipping: ID mismatch (State: ${workbookId}, Current: ${currentUnitId})`);
+      return;
+    }
+
+    const sheetId = sheet.getSheetId();
+
+    Object.keys(fieldConfigs).forEach(path => {
+      const config = fieldConfigs[path];
+      const rawValue = getValueByPath(patientData, path);
+      
+      const hasValue = rawValue !== undefined && rawValue !== null;
+      const targetCell = config.targetCell ? config.targetCell.toUpperCase() : '';
+      
+      // 1. 復元処理 (セル指定が変更/解除された場合) 
+      const restoreInfo = restoreMapRef.current.get(path);
+      
+      // ワークブックが変わった場合、古い履歴は無効なので無視（復元しない）
+      // 同じワークブック内でセルが変わった場合のみ復元
+      if (restoreInfo && restoreInfo.workbookId === workbookId) {
+        if (restoreInfo.cellId !== targetCell) {
+          const { r, c } = parseCellAddress(restoreInfo.cellId) || { r: -1, c: -1 };
+          if (r >= 0) {
+            console.log(`[UniverSheet] Restoring cell: ${restoreInfo.cellId}`);
+            commandService.executeCommand(SetRangeValuesCommand.id, {
+              unitId: workbookId,
+              subUnitId: sheetId,
+              range: { startRow: r, startColumn: c, endRow: r, endColumn: c },
+              value: { v: restoreInfo.value },
+            });
+          }
+          restoreMapRef.current.delete(path);
+        }
+      } else if (restoreInfo && restoreInfo.workbookId !== workbookId) {
+          // ワークブックが変わっていたら、古い履歴は削除
+          restoreMapRef.current.delete(path);
+      }
+
+      // 2. 書き込み処理
+      if (targetCell && hasValue) {
+        const mapping = parseCellAddress(targetCell);
+        if (mapping) {
+          const { r, c } = mapping;
+          
+          // まだこのワークブックでの履歴がなければ、書き込む前の「現在の値」を保存する (Undo用)
+          if (!restoreMapRef.current.has(path)) {
+            const currentCellData = sheet.getCell(r, c);
+            const originalVal = currentCellData ? currentCellData.v : null;
+            
+            console.log(`[UniverSheet] Saving original value for ${path} at ${targetCell}:`, originalVal);
+            restoreMapRef.current.set(path, { 
+                cellId: targetCell, 
+                value: originalVal,
+                workbookId: workbookId // IDを保存
+            });
+          }
+
+          // マッピング変換を適用
+          const finalValue = transformValue(rawValue, config.mappings);
+
+          // 書き込み実行
+          // console.log(`[UniverSheet] Writing ${path} -> ${targetCell}:`, finalValue);
+          commandService.executeCommand(SetRangeValuesCommand.id, {
+            unitId: workbookId,
+            subUnitId: sheetId,
+            range: { startRow: r, startColumn: c, endRow: r, endColumn: c },
+            value: { v: finalValue },
+          });
+        }
+      }
+    });
+  }, [patientData, fieldConfigs, workbookId, univerVersion]); // fieldConfigsの変更やシート切り替えで発火
+
+  // ---------------------------------------------------------------------------
+  // 5. ハンドラ
   // ---------------------------------------------------------------------------
   const loadTemplates = async () => {
     try {
@@ -571,7 +705,7 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
       <div style={{ padding: '8px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'center' }}>
         <strong>Canvas</strong>
         <select value={selectedTemplateId} onChange={handleTemplateChange} style={{ padding: '4px', border: '1px solid #ccc', borderRadius: '4px' }}>
-          <option value="">-- テンプレートを選択 --</option>
+          <option value="">テンプレートを選択</option>
           {templates.map(t => <option key={t.template_id} value={t.template_id}>{t.name}</option>)}
         </select>
         <button onClick={handleLoadTemplate} disabled={!selectedTemplateId} style={btnStyle}><Download size={14} /> 読込</button>
