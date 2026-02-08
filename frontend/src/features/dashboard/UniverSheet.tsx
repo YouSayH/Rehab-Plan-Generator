@@ -620,6 +620,26 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
     }
   };
 
+  // --- [追加] ボーダー変換用ヘルパー ---
+  const BORDER_STYLE_MAP: Record<number, string> = {
+    0: 'none', 1: 'thin', 3: 'dotted', 4: 'dashed', 8: 'medium', 11: 'thick'
+  };
+  const hexToArgb = (hex: string | undefined) => {
+    if (!hex) return undefined;
+    const h = hex.replace('#', '');
+    return h.length === 6 ? 'FF' + h : h;
+  };
+  const getExcelBorder = (bd: any) => {
+    if (!bd || !bd.s) return undefined;
+    // 色指定がない場合は強制的に黒(FF000000)を設定して表示漏れを防ぐ
+    const colorArgb = bd.cl && bd.cl.rgb ? hexToArgb(bd.cl.rgb) : 'FF000000';
+    return { 
+      style: BORDER_STYLE_MAP[bd.s] || 'thin', 
+      color: { argb: colorArgb }
+    };
+  };
+  // ------------------------------------
+
   const handleDownloadExcel = async () => {
     if (!workbookRef.current) return;
 
@@ -630,6 +650,7 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
       
       // 現在のデータを取得
       const snapshot = workbookRef.current.getSnapshot();
+      const styles = snapshot.styles || {}; // スタイル定義を取得
 
       // 各シートをループしてExcelJSに追加
       // @ts-ignore
@@ -637,7 +658,25 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
         const sheetData = snapshot.sheets[sheetId];
         const worksheet = workbook.addWorksheet(sheetData.name || 'Sheet1');
 
-        // 1. セルデータの書き出し
+        // 1. 結合セルの適用 (枠線を正しく描画するために先に実行)
+        if (sheetData.mergeData) {
+          sheetData.mergeData.forEach((merge: any) => {
+            // Univer: 0-based { startRow, endRow, startColumn, endColumn }
+            // ExcelJS: 1-based, top, left, bottom, right
+            try {
+              worksheet.mergeCells(
+                merge.startRow + 1,
+                merge.startColumn + 1,
+                merge.endRow + 1,
+                merge.endColumn + 1
+              );
+            } catch (e) {
+              console.warn('Merge failed or overlapping:', merge);
+            }
+          });
+        }
+
+        // 2. セルデータの書き出し
         if (sheetData.cellData) {
           Object.keys(sheetData.cellData).forEach((rowKey) => {
             const r = parseInt(rowKey);
@@ -646,31 +685,54 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
               const c = parseInt(colKey);
               const cell = rowData[colKey];
               
-              if (cell && (cell.v !== null && cell.v !== undefined)) {
+              if (cell) {
                 // ExcelJSは 1-based index
                 const excelCell = worksheet.getCell(r + 1, c + 1);
-                excelCell.value = cell.v;
                 
-                // ※注: ここで cell.s (スタイル) を逆変換して excelCell に適用すれば
-                // 色やフォントもエクスポート可能ですが、記述量が多いため今回は「値と結合」のみ実装します
+                // 値の設定
+                if (cell.v !== null && cell.v !== undefined) {
+                  excelCell.value = cell.v;
+                }
+
+                // スタイルの適用
+                if (cell.s) {
+                  const style = typeof cell.s === 'string' ? styles[cell.s] : cell.s;
+                  
+                  if (style) {
+                    // --- [追加] 配置 (Alignment) ---
+                    const alignment: any = {};
+                    
+                    // 垂直方向: Univer(1:top, 2:middle, 3:bottom). 指定なしはmiddle(中央)をデフォルトにする
+                    if (style.vt === 1) alignment.vertical = 'top';
+                    else if (style.vt === 3) alignment.vertical = 'bottom';
+                    else alignment.vertical = 'middle'; 
+
+                    // 水平方向: Univer(1:left, 2:center, 3:right)
+                    if (style.ht === 1) alignment.horizontal = 'left';
+                    else if (style.ht === 2) alignment.horizontal = 'center';
+                    else if (style.ht === 3) alignment.horizontal = 'right';
+                    
+                    // 折り返し: Univer(1:wrap)
+                    if (style.tb === 1) alignment.wrapText = true;
+
+                    excelCell.alignment = alignment;
+
+                    // --- 枠線 (Border) ---
+                    if (style.bd) {
+                      const borders: any = {};
+                      if (style.bd.t) borders.top = getExcelBorder(style.bd.t);
+                      if (style.bd.b) borders.bottom = getExcelBorder(style.bd.b);
+                      if (style.bd.l) borders.left = getExcelBorder(style.bd.l);
+                      if (style.bd.r) borders.right = getExcelBorder(style.bd.r);
+                      if (Object.keys(borders).length > 0) excelCell.border = borders;
+                    }
+                  }
+                }
               }
             });
           });
         }
-
-        // 2. 結合セルの適用
-        if (sheetData.mergeData) {
-          sheetData.mergeData.forEach((merge: any) => {
-            // Univer: 0-based { startRow, endRow, startColumn, endColumn }
-            // ExcelJS: 1-based, top, left, bottom, right
-            worksheet.mergeCells(
-              merge.startRow + 1,
-              merge.startColumn + 1,
-              merge.endRow + 1,
-              merge.endColumn + 1
-            );
-          });
-        }
+        
         
         // 3. 列幅の簡易適用 (任意)
         if (sheetData.columnData) {
