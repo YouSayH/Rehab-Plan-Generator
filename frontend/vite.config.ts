@@ -27,6 +27,7 @@ export default defineConfig({
       'react-dom',
       'react-resizable-panels', 
       'lucide-react',
+      'luckyexcel',
       '@univerjs/core',
       '@univerjs/design',
       '@univerjs/engine-render',

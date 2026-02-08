@@ -1,3 +1,4 @@
+# backend/app/schemas/schemas.py
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
@@ -118,3 +119,25 @@ class PlanBatchGenerate(BaseModel):
     patient_data: Dict[str, Any]
     items: List[BatchGenerateItem]
     current_plan: Optional[Dict[str, Any]] = None
+
+# ----------------------------------------------------------------
+# 6. テンプレート管理用 (Template Management)
+# ----------------------------------------------------------------
+class TemplateBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    data: Dict[str, Any]  # Univer Snapshot
+
+class TemplateCreate(TemplateBase):
+    pass
+
+class TemplateRead(BaseModel):
+    template_id: int
+    name: str
+    description: Optional[str] = None
+    created_at: datetime
+    # dataはサイズが大きいため一覧取得時は除外するか、必要に応じて含める
+    # ここでは詳細取得用に含める定義とします
+    data: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(from_attributes=True)

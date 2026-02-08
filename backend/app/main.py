@@ -1,8 +1,9 @@
+# backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # 作成したルーターをインポート
-from app.api.v1.endpoints import patients, plans
+from app.api.v1.endpoints import patients, plans, templates
 
 app = FastAPI(
     title="Rehab Plan Generator API",
@@ -27,6 +28,8 @@ app.add_middleware(
 # ----------------------------------------------------------------
 app.include_router(patients.router, prefix="/api/v1/patients", tags=["patients"])
 app.include_router(plans.router, prefix="/api/v1/plans", tags=["plans"])
+# テンプレート用ルーターを登録
+app.include_router(templates.router, prefix="/api/v1/templates", tags=["templates"])
 
 # 既存のエンドポイント
 @app.get("/api/")

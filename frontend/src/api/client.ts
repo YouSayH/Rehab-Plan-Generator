@@ -1,7 +1,17 @@
+// frontend/src/api/client.ts
 import { PatientExtractionData, PlanRead, PatientRead } from './types';
 
 // 環境に合わせてURLを変更してください
 const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+// テンプレート用型定義
+export interface TemplateRead {
+  template_id: number;
+  name: string;
+  description?: string;
+  data: any; // Univer Snapshot
+  created_at?: string;
+}
 
 export const ApiClient = {
   getPatients: async (): Promise<PatientRead[]> => {
@@ -131,5 +141,34 @@ export const ApiClient = {
       throw new Error(`Failed to fetch patient data: ${response.statusText}`);
     }
     return response.json();
+  },
+
+  // テンプレート関連メソッド
+
+  saveTemplate: async (name: string, data: any, description?: string): Promise<TemplateRead> => {
+    const response = await fetch(`${API_BASE_URL}/templates/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, data }),
+    });
+    if (!response.ok) throw new Error(`Failed to save template: ${response.statusText}`);
+    return response.json();
+  },
+
+  getTemplates: async (): Promise<TemplateRead[]> => {
+    const response = await fetch(`${API_BASE_URL}/templates/`);
+    if (!response.ok) throw new Error(`Failed to fetch templates: ${response.statusText}`);
+    return response.json();
+  },
+  
+  getTemplate: async (id: number): Promise<TemplateRead> => {
+    const response = await fetch(`${API_BASE_URL}/templates/${id}`);
+    if (!response.ok) throw new Error(`Failed to fetch template: ${response.statusText}`);
+    return response.json();
+  },
+  
+  deleteTemplate: async (id: number): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/templates/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error(`Failed to delete template: ${response.statusText}`);
   }
 };

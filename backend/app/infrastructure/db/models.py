@@ -1,3 +1,4 @@
+# backend/app/infrastructure/db/models.py
 import datetime
 from typing import Optional, List, Any
 
@@ -151,6 +152,26 @@ class DocumentsView(Base):
             postgresql_ops={"content_vector": "vector_l2_ops"}
         ),
     )
+
+# ----------------------------------------------------------------
+# 4. 計画書テンプレート (Plan Templates)
+# ----------------------------------------------------------------
+class PlanTemplate(Base):
+    """
+    Excel等から取り込んだ、または作成した計画書のレイアウトテンプレート。
+    Univerのスナップショット(JSON)として保存する。
+    """
+    __tablename__ = "plan_templates"
+
+    template_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="テンプレート名")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="説明")
+    
+    # Univer Snapshot Data (Workbook data)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    
+    created_at: Mapped[datetime.datetime] = mapped_column(default=func.now())
+    updated_at: Mapped[datetime.datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
 """
 副作用・デメリット (Trade-offs)
