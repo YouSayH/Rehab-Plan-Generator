@@ -1,3 +1,13 @@
+"""
+File: backend/tools/check_labels.py
+
+Summary:
+データ抽出スキーマと日本語表示ラベルの網羅性を検証するチェックツール。
+Pydanticモデル（`PatientExtractionSchema`）から生成されるすべてのデータキーを抽出し、それが `constants.py` の `PATIENT_FIELD_LABELS` に日本語ラベルとして定義されているかを照合します。スキーマ変更時にラベル定義の追加忘れを検知（Missing検知）し、不要になった古いキー（Unused検知）を警告します。
+
+Tags: Tool, Utility, Validation, Schema, Labels, Coverage
+"""
+
 import sys
 import os
 from pathlib import Path

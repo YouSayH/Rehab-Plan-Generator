@@ -1,3 +1,20 @@
+"""
+File: backend/app/usecases/plan_generation.py
+
+Summary:
+リハビリテーション総合実施計画書（様式23）の生成ロジックを統括するユースケースファイル。
+APIから受け取った患者データ（抽出結果）を元に、LLMクライアント（Gemini/Ollama等）を呼び出して計画書のドラフトを自動生成します。
+主な処理として、
+1. 個人情報（氏名）のハッシュ化（PII Scrubbingによるプライバシー保護）
+2. Context Builderを用いた入力データの自然言語化（ファクト構築）
+3. 整合性を保つための「段階的生成ループ（現状評価 -> 目標 -> 具体策）」
+4. カスタムプロンプトによる部分生成（`execute_custom`）および一括生成（`execute_batch`）
+5. 生成結果のデータベース（PlanRepository）への保存
+を行っています。
+
+Tags: UseCase, LLM, Plan Generation, Orchestration, Privacy Protection
+"""
+
 import json
 import logging
 from typing import Any, Dict, List, Optional

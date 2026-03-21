@@ -1,3 +1,13 @@
+"""
+File: backend/app/api/v1/endpoints/templates.py
+
+Summary:
+計画書で利用するスプレッドシートのテンプレートに関するAPIエンドポイントを定義するルーターファイル。
+現在のシート状態（JSONデータ）をテンプレートとして保存（POST）、一覧取得・詳細取得（GET）、および削除（DELETE）する機能を提供します。
+
+Tags: API, Router, Endpoints, Templates, CRUD
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select

@@ -1,3 +1,13 @@
+"""
+File: backend/app/schemas/legacy_schemas.py
+
+Summary:
+LLM（AIモデル）に計画書の文章を生成させるための「構造化出力用」Pydanticスキーマファイル。
+各フィールドの `description` 自体が、AIに対する具体的な生成指示（プロンプト、文字数制限、出力例など）として機能するプロンプトエンジニアリングの役割を兼ねています。また、複数の項目を効率的に一度のAPIコールで生成させるために、「現状評価」「目標」「包括的治療計画」といった生成グループの定義も行っています。
+
+Tags: Schema, Pydantic, LLM, Prompt Engineering, Structured Output, Generation
+"""
+
 from typing import List, Type
 
 from pydantic import BaseModel, Field

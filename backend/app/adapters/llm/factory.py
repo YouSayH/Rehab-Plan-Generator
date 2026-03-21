@@ -1,3 +1,13 @@
+"""
+File: backend/app/adapters/llm/factory.py
+
+Summary:
+環境設定に応じて適切なLLMクライアントを生成・提供するファクトリファイル。
+環境変数 `LLM_PROVIDER` の値（`gemini` または `ollama`）を読み取り、対応するLLMクライアントクラスのインスタンスを生成して返却します。
+`@lru_cache` デコレータを使用することで、一度生成したインスタンスをキャッシュし、アプリケーション全体でシングルトンとして効率的に再利用する仕組みを提供しています。
+
+Tags: LLM, Factory, Singleton, Configuration
+"""
 import os
 from functools import lru_cache
 

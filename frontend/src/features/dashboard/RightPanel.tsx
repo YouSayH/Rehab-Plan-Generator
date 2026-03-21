@@ -1,4 +1,12 @@
-// frontend/src/features/dashboard/RightPanel.tsx
+/**
+ * File: frontend/src/features/dashboard/RightPanel.tsx
+ *
+ * Summary:
+ * 画面右側に配置される「AI Co-Editor」パネルのコンポーネント。
+ * `@dnd-kit` を利用したドラッグ＆ドロップ機能を備え、計画書の生成単位となる「パネル」とそれを束ねる「グループ」の並び替えや階層移動が可能です。各パネルにある「生成ボタン」を押すことでAPIへ生成リクエストを送り、生成結果の確認・編集ができるテキストエリアを提供します。また、新しいパネルの作成やプロンプトの編集、全項目の一括生成機能も実装されています。
+ *
+ * Tags: Frontend, React, Drag and Drop, LLM Integration, UI, Panel Manager
+ */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 

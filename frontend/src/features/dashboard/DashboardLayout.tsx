@@ -1,3 +1,13 @@
+/**
+ * File: frontend/src/features/dashboard/DashboardLayout.tsx
+ *
+ * Summary:
+ * アプリケーションのメイン画面（ダッシュボード）の全体的なレイアウトを定義するコンポーネント。
+ * 左パネル（患者情報）、中央（スプレッドシート）、右パネル（生成操作）の3カラム構成を提供します。また、カラム間にドラッグ可能なリサイザーを配置し、マウス操作でユーザーが自由にパネルの幅を調整できる機能を実装しています。中央のシート部分はパフォーマンスを考慮して `React.lazy` で遅延読み込み（Suspense）されています。
+ *
+ * Tags: Frontend, React, Layout, Resizable, Dashboard
+ */
+
 import React, { Suspense, useState, useCallback, useEffect } from 'react';
 import LeftPanel from './LeftPanel';
 import RightPanel from './RightPanel';

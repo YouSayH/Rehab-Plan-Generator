@@ -1,3 +1,13 @@
+"""
+File: backend/app/infrastructure/repositories/plan_repository.py
+
+Summary:
+リハビリテーション計画書データ（PlanDataStore）に対するデータベース操作を提供するリポジトリファイル。
+計画書の新規作成、患者ごとの計画書一覧取得、ID指定での詳細取得機能を実装しています。また、スキーマレスなJSONB形式の `raw_data` に対して、フロントエンドから送られてきた変更差分のみを動的に適用して安全に保存する更新（Update）ロジックを持っています。
+
+Tags: Repository, Database, Plans, CRUD, JSONB
+"""
+
 from typing import List, Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession

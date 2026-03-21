@@ -1,3 +1,13 @@
+"""
+File: backend/tools/check_keys.py
+
+Summary:
+フロントエンドとバックエンド間のデータキーの整合性を検証するクロスチェックツール。
+バックエンドの定数（`constants.py` の `PATIENT_FIELD_LABELS`）と、フロントエンドの型定義（`frontend/src/api/types.ts` の `CELL_MAPPING`）を読み込み、フロントエンドで利用されているキーがバックエンド側に存在するかを突き合わせます。スプレッドシートへの出力エラーを未然に防ぐ役割を持ちます。
+
+Tags: Tool, Utility, Validation, Consistency, Frontend-Backend
+"""
+
 import sys
 import os
 import re

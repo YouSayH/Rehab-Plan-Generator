@@ -1,4 +1,13 @@
-// frontend/src/features/dashboard/PlanContext.tsx
+/**
+ * File: frontend/src/features/dashboard/PlanContext.tsx
+ *
+ * Summary:
+ * アプリケーション全体で共有すべき状態（State）を管理する React Context（状態管理）ファイル。
+ * 選択中の患者データ、現在編集中の計画書データ、生成中フラグのほか、右パネルの「生成パネルの階層構造（グループやアイテム）」や、左パネルの「フィールドのマッピング設定」などを一元管理しています。また、これらの設定をローカルストレージへ保存・復元する処理や、プライバシー保護のためにハッシュIDと患者の実名を紐づけるマッピング管理も担っています。
+ *
+ * Tags: Frontend, React, Context API, State Management, LocalStorage
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { PlanRead, PatientExtractionData, PlanStructure, stringifyCellAddress, CELL_MAPPING, PatientRead, FieldConfigMap, FieldConfig } from '../../api/types';
 import { ApiClient } from '../../api/client';

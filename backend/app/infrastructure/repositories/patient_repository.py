@@ -1,3 +1,13 @@
+"""
+File: backend/app/infrastructure/repositories/patient_repository.py
+
+Summary:
+患者データ（PatientsView）および関連ドキュメントに対するデータベース操作を提供するリポジトリファイル。
+患者の新規登録や一覧・詳細取得といった基本的なCRUD操作に加え、指定された患者の「最新の抽出状態」を取得するメソッドを備えています。最大の特徴として、SQLの条件絞り込み（年齢やFIMなど）と、pgvectorによるベクトル類似度検索（社会背景など）を組み合わせた「ハイブリッド検索機能（Hybrid Search）」を実装しています。
+
+Tags: Repository, Database, Patients, Hybrid Search, pgvector, CRUD
+"""
+
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional

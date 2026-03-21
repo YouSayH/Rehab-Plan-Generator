@@ -1,3 +1,11 @@
+# File: compose.yaml
+#
+# Summary:
+# プロジェクト全体のコンテナ構成を定義する、Docker Composeのベースファイル。
+# データベース（PostgreSQL + pgvector）、バックエンド（FastAPI）、フロントエンド（React/Vite）、およびリバースプロキシ（Nginx）の4つの主要サービスについて、ベースとなるイメージ、ネットワーク連携、ボリューム、ヘルスチェックなどの基本設定を記述し、システム全体の土台を提供します。
+#
+# Tags: Docker, Compose, Infrastructure, Services, Network
+
 name: rehab-plan-generator # プロジェクト名（コンテナ名の接頭辞になります）
 
 services: # ここに起動するサーバー群を定義します

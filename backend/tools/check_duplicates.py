@@ -1,3 +1,13 @@
+"""
+File: backend/tools/check_duplicates.py
+
+Summary:
+定数ファイル（`constants.py`）内の辞書定義におけるキーの重複を検知する静的解析ツール。
+Pythonの `ast`（抽象構文木）モジュールを使用してソースコードを直接解析し、`PATIENT_FIELD_LABELS` 辞書内で同じキーが複数回定義されていないかをチェックします。これにより、後から書かれた定義によって意図せずラベルが上書きされるバグを未然に防ぎます。
+
+Tags: Tool, Utility, Validation, AST, Constants
+"""
+
 import sys
 import os
 import ast

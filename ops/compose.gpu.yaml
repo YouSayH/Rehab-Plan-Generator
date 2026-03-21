@@ -1,3 +1,11 @@
+# File: ops/compose.gpu.yaml
+#
+# Summary:
+# NVIDIA GPUを搭載したホストマシンでアプリケーション（主にOllamaなどのローカルLLM）を高速に動かすためのDocker Composeオーバーライドファイル。
+# バックエンドコンテナに対してホストのGPUリソース（`driver: nvidia`）を割り当て、アプリケーション側にGPUが利用可能であることを伝える環境変数（`USE_GPU=true`）を設定します。
+#
+# Tags: Docker, Compose, GPU, NVIDIA, AI, Acceleration
+
 services:
   backend:
     deploy:

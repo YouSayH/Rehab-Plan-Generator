@@ -1,4 +1,13 @@
-# backend/app/schemas/schemas.py
+"""
+File: backend/app/schemas/schemas.py
+
+Summary:
+APIエンドポイントにおけるリクエスト（入力）とレスポンス（出力）のデータ型を定義・検証する汎用Pydanticスキーマファイル。
+患者（Patient）、計画書（Plan）、ドキュメント（Document）、テンプレート（Template）といった各ドメインに対して、基本（Base）、作成用（Create）、更新用（Update）、読み取り用（Read）のモデルを提供します。加えて、カスタム生成やバッチ生成API用のリクエストモデルもここで管理しています。
+
+Tags: Schema, Pydantic, API, DTO, Validation, CRUD
+"""
+
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field

@@ -1,4 +1,13 @@
-// frontend/src/api/client.ts
+/**
+ * File: frontend/src/api/client.ts
+ *
+ * Summary:
+ * フロントエンドからバックエンドのAPIサーバー（FastAPI）へ通信を行うためのAPIクライアントファイル。
+ * `fetch` APIを使用してHTTPリクエストを送信し、患者一覧の取得、計画書のAI生成（全体・個別・一括）、計画書の保存・更新、およびスプレッドシートのテンプレート管理（保存・取得・削除）などの各エンドポイントに対応する非同期関数を定義しています。通信エラー時の基本的なエラーハンドリングもここで行われます。
+ *
+ * Tags: API Client, Fetch, Frontend, Backend Integration
+ */
+
 import { PatientExtractionData, PlanRead, PatientRead } from './types';
 
 // 環境に合わせてURLを変更してください

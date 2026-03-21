@@ -1,3 +1,13 @@
+"""
+File: backend/app/usecases/utils/prompts.py
+
+Summary:
+計画書生成の各フェーズに応じたプロンプトを構築するための関数群を提供するファイル。
+`prompt_manager.py` を利用してテンプレートを読み込み、全体生成用のプロンプト（`build_group_prompt`）や、特定の項目を修正・再生成するためのプロンプト（`build_regeneration_prompt`）に必要な変数（患者の事実情報、FIMのガイドライン、RAGの参考情報など）を注入して完成版のプロンプトテキストを返却します。
+
+Tags: Utility, Prompt Building, LLM Instructions
+"""
+
 import json
 from typing import Any, Dict, Type, Optional
 from pydantic import BaseModel

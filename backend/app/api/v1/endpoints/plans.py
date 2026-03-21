@@ -1,3 +1,14 @@
+"""
+File: backend/app/api/v1/endpoints/plans.py
+
+Summary:
+リハビリテーション計画書（Plan）に関するAPIエンドポイントを定義するルーターファイル。
+計画書のデータベースに対するCRUD操作を提供するほか、UseCase層（PlanGenerationUseCase）と連携したAI生成機能を担います。
+患者データに基づく計画書ドラフトの全体生成機能や、指定プロンプトによる部分的なテキスト生成、複数項目の一括生成機能へのルーティングを行っています。
+
+Tags: API, Router, Endpoints, Plans, Generation, LLM, UseCase
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List

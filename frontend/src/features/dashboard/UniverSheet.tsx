@@ -1,3 +1,13 @@
+/**
+ * File: frontend/src/features/dashboard/UniverSheet.tsx
+ *
+ * Summary:
+ * 画面中央に配置されるスプレッドシートビューアのコンポーネント。
+ * `@univerjs` を組み込んでExcelライクなUIを提供します。コンテキストから患者データや生成結果を受け取り、左パネルで設定した「セル番地」に従って、シート上の該当セルへリアルタイムに値を反映・復元する同期ロジックを持っています。また、`exceljs` を用いたローカルのExcelファイル（`.xlsx`）のインポート・エクスポート機能や、現在のシートのレイアウトを「テンプレート」としてサーバーに保存・読込する機能も備えています。
+ *
+ * Tags: Frontend, React, Univer, Spreadsheet, Excel Integration, Template
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import '@univerjs/design/lib/index.css';
 import '@univerjs/ui/lib/index.css';

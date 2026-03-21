@@ -1,3 +1,11 @@
+# File: ops/compose.prod.yaml
+#
+# Summary:
+# 本番環境（プロダクション）向けにDocker Composeの設定を上書き・最適化するファイル。
+# セキュリティ向上のためデータベースのポート公開を閉じ（内部通信のみに制限）、バックエンドコンテナのソースコードマウントを解除してイメージに焼き込まれたコードを使用するように変更します。また、NginxにHTTPS通信用の443番ポートを開放するなど、本番運用に適した安全な設定を提供します。
+#
+# Tags: Docker, Compose, Production, Security, Override
+
 services:
   db:
     restart: always

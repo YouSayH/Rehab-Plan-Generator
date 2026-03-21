@@ -1,3 +1,13 @@
+"""
+File: backend/app/schemas/extraction_schemas.py
+
+Summary:
+患者のカルテ情報や評価データを構造化して保持するためのPydanticモデル定義ファイル。
+基本情報、リスク、心身機能、ADL（FIM/BI）、目標など、リハビリ特有の複雑なデータを細かく分類したネスト構造のスキーマを提供します。また、この高度に構造化されたデータを、画面表示や帳票出力で利用しやすい「旧来のフラットなキーバリュー形式（Dict）」へ変換・マッピングするためのメソッド（`export_to_mapping_format`）を内包しています。
+
+Tags: Schema, Pydantic, Data Extraction, ADL, Mapping, Conversion
+"""
+
 from datetime import date
 from typing import Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, computed_field

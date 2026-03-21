@@ -1,3 +1,13 @@
+"""
+File: backend/app/usecases/utils/context_builder.py
+
+Summary:
+LLMに渡すための「患者の事実情報（Context）」を構築するユーティリティファイル。
+DBのフラットな患者データ（Dict）を読み込み、不要な情報（Noneや空文字）を省きつつ、「基本情報」「心身機能・構造」「ADL評価」「目標」といったカテゴリごとに人間（およびLLM）が読みやすい構造化テキストへと変換します。チェックボックスと詳細テキストの関連付け処理や、ADLスコア（FIM/BI）の整形もここで行われます。
+
+Tags: Utility, Context Building, Data Formatting, LLM Input
+"""
+
 import logging
 from datetime import date
 from typing import Any, Dict, Optional

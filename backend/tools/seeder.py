@@ -1,3 +1,13 @@
+"""
+File: backend/tools/seeder.py
+
+Summary:
+開発環境やテスト環境のデータベースに初期データ（ダミーデータ）を自動投入するシードスクリプトファイル。
+数名分の患者属性（`PatientsView`）と、それに紐づくカルテ抽出データ（`DocumentsView` の `latest_state`）を生成して保存します。投入時にPydanticモデル（`PatientExtractionSchema`）を通したバリデーションを行うほか、ハイブリッド検索テスト用のダミーベクトルデータ（768次元）も自動生成する仕組みを備えており、開発の立ち上げをスムーズにします。
+
+Tags: Tool, Seeder, Dummy Data, Database, Testing, pgvector
+"""
+
 import asyncio
 import logging
 import sys

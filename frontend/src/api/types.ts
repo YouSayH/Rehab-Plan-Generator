@@ -1,4 +1,13 @@
-// frontend/src/api/types.ts
+/**
+ * File: frontend/src/api/types.ts
+ *
+ * Summary:
+ * フロントエンドアプリケーション全体で利用されるTypeScriptの型定義（インターフェースと型エイリアス）を集約したファイル。
+ * APIから取得する患者の抽出データ（`PatientExtractionData`など）や計画書データ（`PlanRead`）の型を定義しています。
+ * また、スプレッドシートの「A1」形式のセル番地を行・列インデックスに変換するユーティリティ関数や、UIで表示する生成パネルの階層構造（グループやアイテム）、スプレッドシートへの値の出力マッピング設定などの型定義も含まれており、フロントエンドにおけるデータ構造の青写真となっています。
+ *
+ * Tags: Types, TypeScript, Interfaces, Data Structures, Mapping
+ */
 
 // ==========================================
 // Patient Extraction Data Types

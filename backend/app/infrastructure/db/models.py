@@ -1,4 +1,18 @@
-# backend/app/infrastructure/db/models.py
+"""
+File: backend/app/infrastructure/db/models.py
+
+Summary:
+SQLAlchemyを用いたデータベースのテーブル構造（ORMモデル）を定義するファイル。
+以下の主要なテーブルを定義しています。
+1. `PatientsView`: 個人情報を排したハッシュIDベースの患者属性・特徴量データ（RAGや推論用のベクトルデータ含む）。
+2. `PlanDataStore`: 計画書の本体データ。将来の様式変更に柔軟に対応するため、詳細項目を `raw_data`（JSONB型）に集約するスキーマレス設計を採用。
+3. `DocumentsView`: RAGやハイブリッド検索（キーワード＋ベクトル）用のドキュメントデータ。
+4. `PlanTemplate`: スプレッドシート（Univer）のレイアウトテンプレートデータ。
+※ JSONBやpgvectorを活用した高度な検索・保存要件に対応する設計となっています。
+
+Tags: Database, Models, SQLAlchemy, ORM, Schema, pgvector, JSONB
+"""
+
 import datetime
 from typing import Optional, List, Any
 

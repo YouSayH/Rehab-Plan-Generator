@@ -1,4 +1,13 @@
-// frontend/src/features/dashboard/LeftPanel.tsx
+/**
+ * File: frontend/src/features/dashboard/LeftPanel.tsx
+ *
+ * Summary:
+ * 画面左側に配置される「患者情報管理」パネルのコンポーネント。
+ * 担当患者の選択ドロップダウンを提供し、選択された患者の最新の抽出データ（カルテ情報）をAPIから取得してアコーディオン形式で表示します。また、各データ項目に対して、「AIへのプロンプトに含めるか」「スプレッドシートのどのセルに出力するか」「どのように値を変換するか（例: true → ☑）」といった個別マッピング設定のUIを提供し、その設定を保存します。
+ *
+ * Tags: Frontend, React, Sidebar, Patient Data, Configuration, Mapping
+ */
+
 import React, { useEffect, useState } from 'react';
 import { usePlanContext } from './PlanContext';
 import { ApiClient } from '../../api/client';

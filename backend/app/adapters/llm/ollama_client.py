@@ -1,3 +1,14 @@
+"""
+File: backend/app/adapters/llm/ollama_client.py
+
+Summary:
+ローカル環境で動作するOllamaを利用するためのLLMクライアント具体実装ファイル。
+テキスト生成とJSON生成のインターフェースを実装しているほか、Ollama特有の機能に対応しています。
+具体的には、Thinking Modelを利用した際の思考プロセスのストリーミング出力機能や、環境変数（`OLLAMA_ENABLE_STRUCTURED_OUTPUT`）による厳格な構造化出力モードとプロンプトエンジニアリングモードの動的切り替え機能を提供します。
+
+Tags: LLM, Ollama, Local Model, Adapter, Thinking Model
+"""
+
 import asyncio
 import json
 import os

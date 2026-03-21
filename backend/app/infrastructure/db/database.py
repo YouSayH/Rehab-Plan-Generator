@@ -1,3 +1,13 @@
+"""
+File: backend/app/infrastructure/db/database.py
+
+Summary:
+PostgreSQLデータベースへの非同期接続と、セッション管理のセットアップを行うファイル。
+環境変数からデータベースの接続URL（`DATABASE_URL`）を取得し、SQLAlchemyの `create_async_engine` を用いて非同期通信用のデータベースエンジンを構築します。また、APIリクエストごとにデータベースとのやり取りを行うためのセッションを生成するファクトリ（`AsyncSessionLocal`）を定義・提供しています。
+
+Tags: Database, Infrastructure, SQLAlchemy, Async, Connection, Session
+"""
+
 import os
 import logging
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession

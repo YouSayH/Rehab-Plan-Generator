@@ -1,3 +1,13 @@
+"""
+File: backend/tests/conftest.py
+
+Summary:
+Pytestを用いた自動テストのための共通設定とフィクスチャ（テスト用部品）を定義するファイル。
+テスト実行時に一時的な非同期データベースセッション（`db_session`）を構築し、テストが完了するたびにロールバック（変更の取り消し）を行うことで、テスト間のデータ干渉を防ぎます。また、FastAPIの依存性注入（`get_db`）をテスト用セッションにオーバーライドし、実際のサーバーを立ち上げることなくAPIエンドポイントをテストできる非同期クライアント（`async_client`）を提供します。
+
+Tags: Test, Pytest, Fixture, Database, AsyncClient, FastAPI
+"""
+
 import sys
 import os
 import pytest_asyncio

@@ -1,3 +1,14 @@
+"""
+File: backend/app/api/v1/endpoints/patients.py
+
+Summary:
+患者情報（Patient）に関するAPIエンドポイントを定義するルーターファイル。
+患者の新規登録（POST）、一覧取得・詳細取得（GET）といった基本的なCRUD操作を提供します。
+また、フロントエンドの左ペイン表示用として、患者の最新の構造化データ（抽出状態）を取得するための専用エンドポイントも備えています。
+
+Tags: API, Router, Endpoints, Patients, CRUD
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List

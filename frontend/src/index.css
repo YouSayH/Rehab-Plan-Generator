@@ -1,3 +1,13 @@
+/**
+ * File: frontend/src/index.css
+ *
+ * Summary:
+ * アプリケーション全体のグローバルスタイルを定義するCSSファイル。
+ * ブラウザのデフォルトの余白をリセットし、`html`、`body`、`#root` の高さを `100%` に固定したうえで `overflow: hidden` を指定しています。これにより、ブラウザ画面全体でのスクロールを禁止し、ダッシュボードの各パネル（左・中央・右）内で個別にスクロールさせる「アプリライク」なレイアウトの土台を作っています。
+ *
+ * Tags: Frontend, CSS, Global Styles, Layout
+ */
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

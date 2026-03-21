@@ -1,3 +1,14 @@
+"""
+File: backend/app/adapters/llm/gemini_client.py
+
+Summary:
+Google Gemini APIを利用するためのLLMクライアント具体実装ファイル。
+`google-genai` SDKを使用し、`base.py` で定義されたインターフェースを実装しています。
+同期的なSDKメソッドを `asyncio.to_thread` でラップすることで非同期処理を実現し、テキスト生成機能に加えて、`response_json_schema` を利用したLLMからの厳密なJSON構造化データの抽出機能を提供します。
+
+Tags: LLM, Gemini, Google GenAI, Adapter, API Client
+"""
+
 import asyncio
 import json
 import os

@@ -1,3 +1,13 @@
+"""
+File: backend/migrations/env.py
+
+Summary:
+Alembicを用いたデータベースマイグレーションの環境設定ファイル。
+アプリケーションのORMモデル（`Base.metadata`）を読み込むことで、コード上のモデル定義と実際のデータベース構造の差分を検知し、マイグレーションを自動生成・適用するための基盤となります。非同期DBドライバ（`asyncpg`）に対応するための非同期実行ロジックや、環境変数（`DATABASE_URL`）から接続先を動的に取得するカスタマイズが施されています。
+
+Tags: Alembic, Migration, Database, Async, SQLAlchemy
+"""
+
 import asyncio
 import os
 from logging.config import fileConfig

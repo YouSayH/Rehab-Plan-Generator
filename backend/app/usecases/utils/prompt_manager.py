@@ -1,3 +1,13 @@
+"""
+File: backend/app/usecases/utils/prompt_manager.py
+
+Summary:
+プロンプトテンプレートファイル（`.txt`）の読み込みと、変数展開を管理するユーティリティファイル。
+Pythonの標準ライブラリである `string.Template` を使用し、外部ファイル化されたプロンプトテンプレート内のプレースホルダー（`$variable`）に対して、動的な値（患者のファクト情報や過去の生成結果など）を安全に（`safe_substitute`）埋め込んでプロンプト文字列を生成します。
+
+Tags: Utility, Prompt Management, Template Engine
+"""
+
 import logging
 from pathlib import Path
 from string import Template

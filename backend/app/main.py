@@ -1,4 +1,13 @@
-# backend/app/main.py
+"""
+File: backend/app/main.py
+
+Summary:
+FastAPIアプリケーションのメインエントリーポイントとなるファイル。
+APIサーバーの初期化、CORS（Cross-Origin Resource Sharing）のミドルウェア設定、および各機能層（患者情報、計画書、テンプレート）のルーター登録を行っています。フロントエンドからのAPIリクエストを受け取り、適切なエンドポイント群へ処理を振り分ける「交通整理」の役割を担う、システム全体の起点です。
+
+Tags: FastAPI, Entry Point, CORS, Router Registration, API Server
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

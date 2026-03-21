@@ -1,3 +1,11 @@
+# File: backend/Dockerfile
+#
+# Summary:
+# バックエンドAPI（FastAPI）用のDockerイメージ構築ファイル。
+# 軽量な `python:3.11-slim` をベースイメージとして採用し、Rust製の高速なPythonパッケージマネージャー `uv` を導入することで、システム依存関係（ベース、クラウドLLM用、ローカルGPU用）のインストール処理を劇的に高速化・最適化しています。
+#
+# Tags: Dockerfile, Backend, Python, FastAPI, uv, Optimization
+
 # ----------------------------------------------------------------
 # 1. Base Image
 # ----------------------------------------------------------------

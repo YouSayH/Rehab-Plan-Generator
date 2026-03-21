@@ -1,3 +1,14 @@
+"""
+File: backend/app/api/dependencies.py
+
+Summary:
+FastAPIのエンドポイントで共通利用される依存関係（Dependency Injection）を定義するファイル。
+リクエスト処理中に使用するデータベースの非同期セッションを生成・提供する `get_db` 関数を実装しています。
+APIリクエストごとにセッションを開き、正常終了時・エラー発生時にかかわらず、処理完了後に確実にセッションをクローズ（破棄）するライフサイクル管理を行っています。
+
+Tags: API, Dependency Injection, Database, Session Management, FastAPI
+"""
+
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.db.database import AsyncSessionLocal

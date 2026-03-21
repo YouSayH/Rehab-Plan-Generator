@@ -1,3 +1,13 @@
+"""
+File: backend/tools/check_seeder_schema.py
+
+Summary:
+データベース初期化用ダミーデータ（シードデータ）のスキーマ整合性を検証するチェックツール。
+`seeder.py` 内で定義されたテストデータを対象に、Pydanticのバリデーションモードを一時的に厳格化（未定義の余分なフィールドを禁止する `extra='forbid'`）して検証を実行します。これにより、スキーマ変更の取りこぼしや、ダミーデータ作成時のタイポを早期に発見します。
+
+Tags: Tool, Utility, Validation, Pydantic, Seeder, Strict Mode
+"""
+
 import sys
 import os
 import inspect

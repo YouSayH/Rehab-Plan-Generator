@@ -1,4 +1,13 @@
-# backend/app/adapters/llm/base.py
+"""
+File: backend/app/adapters/llm/base.py
+
+Summary:
+LLMクライアントの抽象基底クラス（インターフェース）を定義するファイル。
+システム全体で利用する様々なLLM（GeminiやOllamaなど）の共通仕様を定めています。
+具体的には、単純なテキスト生成を行う `generate_text` と、Pydanticスキーマに基づいてJSON形式の構造化データを生成する `generate_json` の2つの抽象メソッドを定義し、具象クラスでの実装を強制しています。
+
+Tags: LLM, Adapter, Interface, Abstract Base Class
+"""
 import abc
 from typing import Any, Dict, Type
 
