@@ -28,7 +28,8 @@ export interface BasicInfo {
   gender: '男' | '女' | null;
   age_display?: string;
   disease_name?: string | null;
-  onset_date?: string | null;
+  // 文字列だけでなく、展開後のオブジェクトも許容する
+  onset_date?: string | { raw: string; year: string; month: string; day: string; full: string } | null;
   history?: string | null;
 }
 
@@ -189,10 +190,11 @@ export type PlanStructure = PlanNode[];
 // ==========================================
 
 
-// 値の変換ルール (例: from="true", to="☑")
+// 値の変換ルール (例: from="true", to="☑", targetCell="A1")
 export interface ValueMapping {
   from: string;
-  to: string;
+  to?: string;          // 値の変換が不要な場合もあるため任意(?)に変更
+  targetCell?: string;  // 条件に一致した場合の出力先セルを追加
 }
 
 /**
@@ -200,8 +202,8 @@ export interface ValueMapping {
  */
 export interface FieldConfig {
   path: string;           // データのパス (例: "medical.hypertension")
-  targetCell: string;     // 出力先セル (例: "C10")
-  mappings: ValueMapping[]; // 汎用的な値変換ルール
+  targetCell?: string;     // 全てmappingsで分岐する場合はデフォルトセルが不要になるため任意(?)に変更
+  mappings: ValueMapping[]; // 汎用的な値とセルの変換ルール
   includeInPrompt: boolean; // プロンプトに含めるかどうか
 }
 

@@ -56,12 +56,21 @@ const UniverSheet: React.FC = () => {
   // ユーティリティ: パスから値を取得
   const getValueByPath = (obj: any, path: string) => path.split('.').reduce((acc, part) => acc && acc[part], obj);
 
-  // ユーティリティ: 値変換
-  const transformValue = (rawValue: any, mappings: ValueMapping[]) => {
+  // ユーティリティ: マッピングルールに従い、最終的な値と出力先セルを決定する
+  const determineOutput = (rawValue: any, config: typeof fieldConfigs[string]) => {
+    let value = rawValue;
+    let cell = config.targetCell ? config.targetCell.toUpperCase() : '';
+    
     const strValue = String(rawValue);
-    if (!mappings || mappings.length === 0) return rawValue;
-    const found = mappings.find(m => m.from === strValue || m.from.toLowerCase() === strValue.toLowerCase());
-    return found ? found.to : rawValue;
+    if (config.mappings && config.mappings.length > 0) {
+      const found = config.mappings.find(m => m.from === strValue || m.from.toLowerCase() === strValue.toLowerCase());
+      if (found) {
+        if (found.to !== undefined && found.to !== '') value = found.to;
+        // マッピング側にセル指定があれば、デフォルトのセルを上書きする
+        if (found.targetCell && found.targetCell.trim() !== '') cell = found.targetCell.toUpperCase();
+      }
+    }
+    return { value, cell };
   };
 
 // ---------------------------------------------------------------------------
@@ -459,9 +468,10 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
     Object.keys(fieldConfigs).forEach(path => {
       const config = fieldConfigs[path];
       const rawValue = getValueByPath(patientData, path);
-      
       const hasValue = rawValue !== undefined && rawValue !== null;
-      const targetCell = config.targetCell ? config.targetCell.toUpperCase() : '';
+      
+      // まず最初にマッピングを評価し、書き込むべき値とセルを決定する
+      const { value: finalValue, cell: targetCell } = determineOutput(rawValue, config);
       
       // 1. 復元処理 (セル指定が変更/解除された場合) 
       const restoreInfo = restoreMapRef.current.get(path);
@@ -506,8 +516,7 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
             });
           }
 
-          // マッピング変換を適用
-          const finalValue = transformValue(rawValue, config.mappings);
+          // すでに determineOutput で計算済みの finalValue をそのまま使用する
 
           // 書き込み実行
           // console.log(`[UniverSheet] Writing ${path} -> ${targetCell}:`, finalValue);

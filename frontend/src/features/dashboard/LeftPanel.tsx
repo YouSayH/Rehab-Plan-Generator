@@ -36,9 +36,13 @@ const SCHEMA_DEF = [
       { key: 'age', label: '年齢', type: 'number' },
       { key: 'gender', label: '性別', type: 'text' },
       { key: 'disease_name', label: '疾患名', type: 'text' },
-      { key: 'diagnosis_code', label: '診断コード', type: 'text' }, // 追加
-      { key: 'onset_date', label: '発症日', type: 'date' },
-      { key: 'history', label: '病歴', type: 'text' }, // 追加
+      { key: 'diagnosis_code', label: '診断コード', type: 'text' },
+      // 日付を分割してマッピングできるように仮想フィールドを追加
+      { key: 'onset_date.full', label: '発症日 (年/月/日)', type: 'text' },
+      { key: 'onset_date.year', label: '発症日 (年のみ)', type: 'text' },
+      { key: 'onset_date.month', label: '発症日 (月のみ)', type: 'text' },
+      { key: 'onset_date.day', label: '発症日 (日のみ)', type: 'text' },
+      { key: 'history', label: '病歴', type: 'text' },
     ]
   },
   {
@@ -150,6 +154,30 @@ const LeftPanel: React.FC = () => {
     setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // 日付文字列(YYYY-MM-DD)をオブジェクトに展開するヘルパー関数
+  const expandDateFields = (data: any) => {
+    const cloned = JSON.parse(JSON.stringify(data));
+    const traverse = (obj: any) => {
+      for (const key in obj) {
+        if (typeof obj[key] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(obj[key])) {
+          const [year, month, day] = obj[key].split('-');
+          obj[key] = {
+            raw: obj[key],
+            year: year,
+            month: parseInt(month, 10).toString(), // "04" -> "4" のように整形
+            day: parseInt(day, 10).toString(),
+            full: `${year}/${month}/${day}`
+          };
+        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+          traverse(obj[key]);
+        }
+      }
+    };
+    traverse(cloned);
+    return cloned;
+  };
+
+
   // データ取得
   useEffect(() => {
     const fetchData = async () => {
@@ -159,8 +187,12 @@ const LeftPanel: React.FC = () => {
       try {
         console.log(`Fetching data for: ${currentHashId}`);
         const data = await ApiClient.getLatestState(currentHashId);
-        setPatientData(data);
-        if (data.basic && data.basic.name) {
+        
+        // ★ 取得したデータを展開してからStateにセットする
+        const processedData = expandDateFields(data);
+        setPatientData(processedData);
+        
+        if (processedData.basic && processedData.basic.name) {
           registerPatientName(currentHashId, data.basic.name);
         }
       } catch (err) {
@@ -201,7 +233,8 @@ const LeftPanel: React.FC = () => {
       handleConfigChange(path, 'mappings', newMap);
     };
     
-    const updateMapping = (index: number, key: 'from' | 'to', val: string) => {
+    // keyの型を拡張して targetCell も受け取れるようにする
+    const updateMapping = (index: number, key: 'from' | 'to' | 'targetCell', val: string) => {
       const newMap = [...(config.mappings || [])];
       newMap[index] = { ...newMap[index], [key]: val };
       handleConfigChange(path, 'mappings', newMap);
@@ -293,10 +326,17 @@ const LeftPanel: React.FC = () => {
                   <ArrowRight size={12} color="#cbd5e1"/>
                   <input 
                     placeholder="変換 (例: ☑)" 
-                    value={m.to} 
+                    value={m.to || ''} // toが任意になったためフォールバック
                     onChange={e => updateMapping(idx, 'to', e.target.value)}
                     style={mappingInputStyle}
                   />
+                  <input 
+                    placeholder="セル (例: A1)" 
+                    value={m.targetCell || ''} 
+                    onChange={e => updateMapping(idx, 'targetCell', e.target.value)}
+                    style={{...mappingInputStyle, width: '50px'}} 
+                  />
+                  {/* ▲ 追加ここまで ▲ */}
                   <button onClick={() => removeMapping(idx)} style={{ border:'none', background:'none', cursor:'pointer', color: '#ef4444' }}>
                     <Trash2 size={12} />
                   </button>
