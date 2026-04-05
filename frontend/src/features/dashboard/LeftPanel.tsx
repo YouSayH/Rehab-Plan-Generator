@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { usePlanContext } from './PlanContext';
 import { ApiClient } from '../../api/client';
-import { ChevronDown, ChevronRight, LayoutGrid, Save, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutGrid, Save, Plus, Trash2, ArrowRight, MousePointerClick } from 'lucide-react';
 import { ValueMapping } from '../../api/types';
 
 const presetBtnStyle: React.CSSProperties = {
@@ -137,7 +137,8 @@ const LeftPanel: React.FC = () => {
   const { 
     patientData, setPatientData, registerPatientName, 
     currentHashId, setCurrentHashId, patientList,
-    fieldConfigs, updateFieldConfig, saveStructureToStorage
+    fieldConfigs, updateFieldConfig, saveStructureToStorage,
+    selectedCellAddress
   } = usePlanContext();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -304,6 +305,20 @@ const LeftPanel: React.FC = () => {
                 fontSize: '0.8rem', width: '80px', color: '#334155'
               }}
             />
+            <button 
+              type="button"
+  onClick={() => handleConfigChange(path, 'targetCell', selectedCellAddress || '')}
+  disabled={!selectedCellAddress}
+              title={`シートで選択中のセル(${selectedCellAddress || 'なし'})を適用`}
+              style={{ 
+                ...presetBtnStyle, 
+                color: selectedCellAddress ? '#4f46e5' : '#cbd5e1',
+                borderColor: selectedCellAddress ? '#818cf8' : '#cbd5e1',
+                display: 'flex', alignItems: 'center', gap: '2px'
+              }}
+            >
+              <MousePointerClick size={12} />
+            </button>
             {/* 簡易プリセットボタン */}
             <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
               <button onClick={() => applyPreset('checkbox')} title="☑/□" style={presetBtnStyle}>☑</button>
@@ -336,6 +351,14 @@ const LeftPanel: React.FC = () => {
                     onChange={e => updateMapping(idx, 'targetCell', e.target.value)}
                     style={{...mappingInputStyle, width: '50px'}} 
                   />
+                  <button 
+                    onClick={() => updateMapping(idx, 'targetCell', selectedCellAddress || '')}
+                    disabled={!selectedCellAddress}
+                    title="選択中セルを入力"
+                    style={{ border:'none', background:'none', cursor: selectedCellAddress ? 'pointer' : 'not-allowed', color: selectedCellAddress ? '#4f46e5' : '#ccc', padding: 0 }}
+                  >
+                    <MousePointerClick size={12} />
+                  </button>
                   {/* ▲ 追加ここまで ▲ */}
                   <button onClick={() => removeMapping(idx)} style={{ border:'none', background:'none', cursor:'pointer', color: '#ef4444' }}>
                     <Trash2 size={12} />

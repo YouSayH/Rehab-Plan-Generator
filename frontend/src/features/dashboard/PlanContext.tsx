@@ -106,6 +106,10 @@ interface PlanContextType {
   fieldConfigs: FieldConfigMap;
   updateFieldConfig: (path: string, diff: Partial<FieldConfig>) => void;
   getFilteredPatientData: () => PatientExtractionData | null;
+
+  // 選択中のセル情報
+  selectedCellAddress: string | null;
+  setSelectedCellAddress: (address: string | null) => void;
 }
 
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
@@ -147,6 +151,9 @@ export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // フィールド設定の状態
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfigMap>({});
+
+  // 選択中のセル情報
+  const [selectedCellAddress, setSelectedCellAddress] = useState<string | null>(null);
 
   // 初期ロード時にLocalStorageから復元
   useEffect(() => {
@@ -255,7 +262,8 @@ const getPatientName = useCallback((hashId: string): string | null => {
       registerPatientName, getPatientName,
       patientList, currentHashId,
       setCurrentHashId, loadPatientList,
-      fieldConfigs, updateFieldConfig, getFilteredPatientData
+      fieldConfigs, updateFieldConfig, getFilteredPatientData,
+      selectedCellAddress, setSelectedCellAddress
     }}>
       {children}
     </PlanContext.Provider>

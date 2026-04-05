@@ -41,7 +41,7 @@ const UniverSheet: React.FC = () => {
   // インスタンス再生成を検知するためのバージョンキーを追加
   const [univerVersion, setUniverVersion] = useState(0);
 
-  const { currentPlan, planStructure, fieldConfigs, patientData } = usePlanContext();
+  const { currentPlan, planStructure, fieldConfigs, patientData, setSelectedCellAddress } = usePlanContext();
   const [templates, setTemplates] = useState<TemplateRead[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -370,6 +370,43 @@ const transformExcelJSToUniver = (workbook: ExcelJS.Workbook) => {
       }
     };
   }, []);
+
+  // セル選択の検知と座標の保存
+  useEffect(() => {
+    if (!univerRef.current) return;
+    try {
+      // @ts-ignore
+      const commandService = univerRef.current.__getInjector().get(ICommandService);
+      if (!commandService) return;
+
+      const disposable = commandService.onCommandExecuted((commandInfo: any) => {
+        if (commandInfo.id === 'sheet.operation.set-selections') {
+          const params = commandInfo.params as any;
+          if (params?.selections?.length > 0) {
+            const range = params.selections[0].range;
+            const r = range.startRow;
+            const c = range.startColumn;
+            
+            // 列インデックスをアルファベット(A, B, C...)に変換
+            let temp = c;
+            let colName = '';
+            while (temp >= 0) {
+              colName = String.fromCharCode(65 + (temp % 26)) + colName;
+              temp = Math.floor(temp / 26) - 1;
+            }
+            setSelectedCellAddress(`${colName}${r + 1}`);
+          }
+        }
+      });
+      return () => {
+        if (disposable && typeof disposable.dispose === 'function') {
+          disposable.dispose();
+        }
+      };
+    } catch (e) {
+      console.warn('Failed to bind selection listener', e);
+    }
+  }, [univerVersion, setSelectedCellAddress]);
 
   // ---------------------------------------------------------------------------
   // 3. データ反映ロジック

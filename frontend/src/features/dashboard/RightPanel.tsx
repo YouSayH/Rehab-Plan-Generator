@@ -35,7 +35,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { 
   Sparkles, Play, Edit3, Loader2, Plus, Trash2, Save, 
   MoreHorizontal, X, LayoutGrid, Folder, ChevronDown, 
-  ChevronRight, GripVertical, FolderPlus
+  ChevronRight, GripVertical, FolderPlus, MousePointerClick
 } from 'lucide-react';
 
 import { usePlanContext } from './PlanContext';
@@ -254,7 +254,8 @@ const RightPanel: React.FC = () => {
     currentPlan, setCurrentPlan, patientData, 
     planStructure, setPlanStructure, 
     resetPlanStructure, saveStructureToStorage,
-    getPatientName
+    getPatientName,
+    selectedCellAddress
   } = usePlanContext();
   
   // 同時生成のためにSetでIDを管理
@@ -767,15 +768,35 @@ const RightPanel: React.FC = () => {
                    <input value={editingItem.title} onChange={e => setEditingItem({...editingItem, title: e.target.value})} style={inputStyle} placeholder="タイトル"/>
                  </label>
                  <label style={labelStyle}>出力先セル (任意)
-                   <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                     <input 
-                       type="text" 
-                       value={editingItem.targetCell || ''} 
-                       onChange={e => setEditingItem({...editingItem, targetCell: e.target.value.toUpperCase()})}
-                       style={{ ...inputStyle, paddingLeft: '32px' }}
-                       placeholder="A1"
-                     />
-                     <LayoutGrid size={16} style={{ position: 'absolute', left: '10px', color: '#94a3b8' }} />
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <div style={{ display: 'flex', alignItems: 'center', position: 'relative', flex: 1 }}>
+                       <input 
+                         type="text" 
+                         value={editingItem.targetCell || ''} 
+                         onChange={e => setEditingItem({...editingItem, targetCell: e.target.value.toUpperCase()})}
+                         style={{ ...inputStyle, paddingLeft: '32px' }}
+                         placeholder="A1"
+                       />
+                       <LayoutGrid size={16} style={{ position: 'absolute', left: '10px', color: '#94a3b8' }} />
+                     </div>
+                     <button 
+                       type="button"
+  onClick={() => setEditingItem({...editingItem, targetCell: selectedCellAddress || ''})}
+  disabled={!selectedCellAddress}
+                       title="シートで選択中のセルを適用"
+                       style={{ 
+                         display: 'flex', alignItems: 'center', gap: '4px',
+                         padding: '6px 10px', borderRadius: '6px', 
+                         border: `1px solid ${selectedCellAddress ? '#818cf8' : '#cbd5e1'}`, 
+                         background: selectedCellAddress ? '#eef2ff' : '#f8fafc', 
+                         color: selectedCellAddress ? '#4f46e5' : '#94a3b8', 
+                         cursor: selectedCellAddress ? 'pointer' : 'not-allowed', 
+                         whiteSpace: 'nowrap', fontSize: '0.8rem'
+                       }}
+                     >
+                       <MousePointerClick size={14} />
+                       {selectedCellAddress || '選択なし'}
+                     </button>
                    </div>
                  </label>
               </div>
