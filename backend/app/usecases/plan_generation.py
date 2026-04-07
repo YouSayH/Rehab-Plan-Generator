@@ -153,11 +153,15 @@ class PlanGenerationUseCase:
         Returns:
             str: 生成されたテキスト
         """
-        # 簡易的に事実情報を構築（Validationなしでdictをそのまま使用する簡易版）
-        # 注意: export_to_mapping_formatを通していないため、patient_dataの構造に依存します。
-        # 本格運用時はPatientExtractionSchemaでバリデーションしてから変換推奨。
+        logger.debug("execute_custom: Parsing and formatting patient_data")
         
-        facts_str = json.dumps(patient_data, ensure_ascii=False, indent=2)
+        # PatientExtractionSchemaでパース・バリデーションし、正規化と事実情報構築を行う
+        validated_data = PatientExtractionSchema(**patient_data)
+        flat_data = validated_data.export_to_mapping_format()
+        facts = prepare_patient_facts(flat_data, "")
+        facts_str = json.dumps(facts, ensure_ascii=False, indent=2)
+        
+        logger.debug(f"execute_custom: Formatted facts length: {len(facts_str)} chars")
         
         # 既存計画のコンテキスト化
         plan_context_str = ""
@@ -193,8 +197,15 @@ class PlanGenerationUseCase:
         """
         指定された複数の項目(キーとプロンプト)に基づいて一括生成を行う。
         """
-        # 1. 事実情報の構築 (簡易版)
-        facts_str = json.dumps(patient_data, ensure_ascii=False, indent=2)
+        logger.debug("execute_batch: Parsing and formatting patient_data")
+        
+        # 1. 事実情報の構築 (PatientExtractionSchemaによるバリデーションとフォーマット)
+        validated_data = PatientExtractionSchema(**patient_data)
+        flat_data = validated_data.export_to_mapping_format()
+        facts = prepare_patient_facts(flat_data, "")
+        facts_str = json.dumps(facts, ensure_ascii=False, indent=2)
+        
+        logger.debug(f"execute_batch: Formatted facts length: {len(facts_str)} chars")
 
         # 2. 動的なPydanticモデルの生成
         # itemsの内容に基づいて、{ "risk_txt": (str, Field(...)), "goal_txt": ... } という定義を作る
