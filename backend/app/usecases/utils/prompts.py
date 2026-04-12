@@ -31,15 +31,22 @@ def build_group_prompt(
     group_schema: Type[BaseModel],
     patient_facts_str: str,
     generated_plan_so_far: Dict[str, Any],
+    similar_cases_str: str = ""
 ) -> str:
     """
     計画書生成（グループ単位）用のプロンプトを構築する
     """
+    # RAGコンテキスト（類似症例）がある場合のみヘッダーを付ける
+    rag_text = ""
+    if similar_cases_str:
+        rag_text = f"# 参考情報 (類似過去事例)\n過去の類似症例データです。専門的な表現や計画の方向性を参考にしつつ、今回の患者様に適した形に調整して活用してください。\n```json\n{similar_cases_str}\n```\n"
+
     # テンプレートに渡す変数を辞書として準備
     variables = {
         "patient_facts": patient_facts_str,
         "generated_plan": json.dumps(generated_plan_so_far, indent=2, ensure_ascii=False, default=str),
         "fim_guidelines": FIM_GUIDELINES,
+        "similar_cases_context": rag_text,
         "schema_json": json.dumps(group_schema.model_json_schema(), indent=2, ensure_ascii=False)
     }
 

@@ -29,6 +29,7 @@ services:
       LOG_LEVEL: debug
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       LLM_PROVIDER: ${LLM_PROVIDER}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     extra_hosts:
       - "host.docker.internal:host-gateway"
