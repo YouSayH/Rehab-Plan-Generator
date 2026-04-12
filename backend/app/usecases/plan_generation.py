@@ -24,7 +24,7 @@ from pydantic import create_model, Field
 
 from app.adapters.llm.factory import get_llm_client
 from app.adapters.embedding.factory import get_embedding_client
-from app.core.constants import PATIENT_FIELD_LABELS
+# from app.core.constants import PATIENT_FIELD_LABELS
 from app.infrastructure.repositories.plan_repository import PlanRepository
 from app.infrastructure.repositories.rag_repository import RAGRepository
 from app.schemas.extraction_schemas import PatientExtractionSchema
@@ -187,7 +187,7 @@ class PlanGenerationUseCase:
         patient_data: Dict[str, Any],
         prompt: str,
         current_plan: Optional[Dict[str, Any]] = None
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
         カスタムプロンプトによる部分生成を実行します。
         
@@ -214,6 +214,7 @@ class PlanGenerationUseCase:
         # その場でベクトルを生成し、過去の類似事例を検索してプロンプトに組み込む
         # =========================================================================
         similar_cases_str = ""
+        references_list = []
         try:
             logger.info("execute_custom: Generating vector for RAG similarity search...")
             # 検索用テキストの作成（DB保存時と同じ形式に）
@@ -243,6 +244,30 @@ class PlanGenerationUseCase:
             )
             
             if similar_docs:
+                # フロントエンドの型に合わせてデータを抽出
+                for doc in similar_docs:
+                    doc_dict = doc if isinstance(doc, dict) else (getattr(doc, "__dict__", {}))
+                    
+                    # entitiesが辞書型 {"diagnosis": ["脳梗塞"]} の場合、フラットなリストに変換
+                    raw_entities = doc_dict.get("entities", [])
+                    formatted_entities = []
+                    if isinstance(raw_entities, dict):
+                        for k, v in raw_entities.items():
+                            if isinstance(v, list):
+                                formatted_entities.extend(v)
+                            else:
+                                formatted_entities.append(str(v))
+                    elif isinstance(raw_entities, list):
+                        formatted_entities = raw_entities
+                        
+                    references_list.append({
+                        "id": doc_dict.get("hash_id") or doc_dict.get("doc_id", "不明"),
+                        "title": doc_dict.get("doc_type", "過去事例"),
+                        "similarity": doc_dict.get("similarity", 0.9), 
+                        "content": doc_dict.get("summary_text") or doc_dict.get("original_text", ""),
+                        "entities": formatted_entities
+                    })
+
                 similar_docs_json = json.dumps(similar_docs, ensure_ascii=False, indent=2)
                 similar_cases_str = f"\n【参考情報 (過去の類似事例)】\n以下の過去事例を参考に、今回の患者様に適した内容を生成してください。\n```json\n{similar_docs_json}\n```\n"
                 logger.info(f"execute_custom: Found {len(similar_docs)} similar cases.")
@@ -278,7 +303,10 @@ class PlanGenerationUseCase:
         # テキスト生成としてLLMを呼び出し
         response_text = await self.llm_client.generate_text(full_prompt)
         
-        return response_text
+        return {
+            "result": response_text,
+            "references": references_list
+        }
 
     async def execute_batch(
         self,

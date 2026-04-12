@@ -108,17 +108,17 @@ async def generate_custom_part(
 ):
     """
     カスタムプロンプトに基づいて部分的なテキスト生成を行います。
-    結果はJSONで {"result": "生成されたテキスト"} として返します。
+    結果はJSONで {"result": "生成されたテキスト", "references": [...]} として返します。
     """
-    print(f"[API] POST /plans/generate/custom Request received.")
+    print("[API] POST /plans/generate/custom Request received.")
     
     usecase = PlanGenerationUseCase(db)
     try:
-        result_text = await usecase.execute_custom(
+        response_data = await usecase.execute_custom(
             patient_data=request.patient_data,
             prompt=request.prompt
         )
-        return {"result": result_text}
+        return response_data
     except Exception as e:
         print(f"[API] Error during custom generation: {e}")
         raise HTTPException(

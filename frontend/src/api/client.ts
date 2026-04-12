@@ -72,7 +72,7 @@ export const ApiClient = {
     prompt: string, 
     targetKey?: string,
     currentPlan?: Record<string, any>
-  ): Promise<{ result: string }> => {
+  ): Promise<{ result: string; references?: any[] }> => {
     const response = await fetch(`${API_BASE_URL}/plans/generate/custom`, {
       method: 'POST',
       headers: {
