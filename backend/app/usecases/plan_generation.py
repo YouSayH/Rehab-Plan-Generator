@@ -86,6 +86,49 @@ class PlanGenerationUseCase:
         # デバッグ用: 生成の根拠となる事実情報をログ出力
         logger.debug(f"Patient Facts prepared: {len(facts_str)} chars")
 
+        # =========================================================================
+        # [RAG / 類似症例検索]
+        # ベテランの臨床推論を再現するため、ベクトル検索等で過去の類似症例・カルテを取得する。
+        # =========================================================================
+        similar_cases_str = ""
+        try:
+            from app.infrastructure.db.models import PatientsView
+            from app.infrastructure.repositories.rag_repository import RAGRepository
+            
+            # 1. 自身の患者データをDBから取得し、検索用のベクトル(social_vector)を得る
+            # ※事前に外部から患者データ連携時にベクトル化されている前提
+            patient_model = await self.db.get(PatientsView, hash_id) 
+            
+            if patient_model and patient_model.social_vector:
+                logger.info(f"Searching similar cases using social_vector for {hash_id}")
+                
+                rag_repo = RAGRepository(self.db)
+                
+                # 同一疾患の患者に絞るためのフィルタ（flat_dataに疾患コードがあれば使用）
+                filters = {}
+                if "diagnosis_code" in flat_data and flat_data["diagnosis_code"]:
+                     filters["diagnosis"] = str(flat_data["diagnosis_code"])
+                
+                # ベクトル検索の実行
+                similar_docs = await rag_repo.search_similar_documents(
+                    query_vector=patient_model.social_vector,
+                    filters=filters,
+                    exclude_hash_id=hash_id, # 自身は除外する
+                    limit=2
+                )
+                
+                if similar_docs:
+                    similar_cases_str = json.dumps(similar_docs, ensure_ascii=False, indent=2)
+                    logger.debug(f"Similar cases formatted for prompt: {len(similar_docs)} docs")
+                else:
+                    logger.debug("No similar cases found matching the criteria.")
+            else:
+                logger.info(f"Patient {hash_id} has no social_vector, skipping similarity search.")
+                
+        except Exception as e:
+            # 検索に失敗しても計画書の生成自体は続行できるようにエラーを握り潰してログに残す
+            logger.error(f"Error during RAG similarity search: {e}", exc_info=True)
+
         # 生成結果を蓄積する辞書
         generated_plan: Dict[str, Any] = {}
 
@@ -98,11 +141,12 @@ class PlanGenerationUseCase:
 
             try:
                 # プロンプト作成
-                # これまでの生成結果(generated_plan)を渡すことで、文脈を踏まえた一貫性のある生成が可能
+                # これまでの生成結果に加え、類似症例情報(RAGコンテキスト)を渡す
                 prompt = build_group_prompt(
                     group_schema=group_schema,
                     patient_facts_str=facts_str,
-                    generated_plan_so_far=generated_plan
+                    generated_plan_so_far=generated_plan,
+                    similar_cases_str=similar_cases_str  # 追加: 類似過去事例のコンテキスト
                 )
                 logger.info(f"\n{'='*20} PROMPT FOR {schema_name} {'='*20}\n{prompt}\n{'='*60}")
 
