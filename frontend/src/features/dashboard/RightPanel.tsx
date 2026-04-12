@@ -255,7 +255,8 @@ const RightPanel: React.FC = () => {
     planStructure, setPlanStructure, 
     resetPlanStructure, saveStructureToStorage,
     getPatientName,
-    selectedCellAddress
+    selectedCellAddress,
+    setReferences
   } = usePlanContext();
   
   // 同時生成のためにSetでIDを管理
@@ -337,13 +338,18 @@ const RightPanel: React.FC = () => {
       const planId = currentPlanRef.current?.plan_id;
 
       // 生成API呼び出し
-      const { result } = await ApiClient.generateCustom(
+      const { result, references } = await ApiClient.generateCustom(
         patientData, 
         item.prompt, 
         item.targetKey,
         contextRawData 
       );
       
+      // 参照ソースをContextに保存して左ペインに表示
+      if (references) {
+        setReferences(references);
+      }
+
       // 保存処理
       const latestRawData = currentPlanRef.current?.raw_data || {};
       const newRawData = { ...latestRawData, [item.targetKey]: result };

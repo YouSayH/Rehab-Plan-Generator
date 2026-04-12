@@ -72,7 +72,19 @@ const STORAGE_KEY_PLAN_STRUCTURE = 'rehab_app_plan_structure';
 const STORAGE_KEY_NAME_MAP = 'rehab_app_patient_name_map';
 const STORAGE_KEY_FIELD_CONFIG = 'rehab_app_field_config_v1';
 
+export interface ReferenceSource {
+  id: string;
+  title: string;
+  similarity: number;
+  content: string;
+  entities?: string[];
+}
+
 interface PlanContextType {
+  // 参照ソース (RAG)
+  references: ReferenceSource[];
+  setReferences: (refs: ReferenceSource[]) => void;
+
   // 生成結果の計画書
   currentPlan: PlanRead | null;
   setCurrentPlan: (plan: PlanRead) => void;
@@ -115,6 +127,7 @@ interface PlanContextType {
 const PlanContext = createContext<PlanContextType | undefined>(undefined);
 
 export const PlanProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [references, setReferences] = useState<ReferenceSource[]>([]);
   const [currentPlan, setCurrentPlan] = useState<PlanRead | null>(null);
   const [patientData, setPatientData] = useState<PatientExtractionData | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -254,6 +267,7 @@ const getPatientName = useCallback((hashId: string): string | null => {
 
   return (
     <PlanContext.Provider value={{ 
+      references, setReferences,
       currentPlan, setCurrentPlan, 
       patientData, setPatientData,
       isGenerating, setIsGenerating,

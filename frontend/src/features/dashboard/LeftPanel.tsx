@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { usePlanContext } from './PlanContext';
 import { ApiClient } from '../../api/client';
-import { ChevronDown, ChevronRight, LayoutGrid, Save, Plus, Trash2, ArrowRight, MousePointerClick } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutGrid, Save, Plus, Trash2, ArrowRight, MousePointerClick, BookOpen } from 'lucide-react';
 import { ValueMapping } from '../../api/types';
 
 const presetBtnStyle: React.CSSProperties = {
@@ -129,6 +129,58 @@ const getValue = (obj: any, path: string) => {
   return path.split('.').reduce((acc, part) => acc && acc[part], obj);
 };
 
+// ユーティリティ: RAGの生テキスト（Python辞書文字列等）を見やすく整形する
+const formatReference = (ref: any) => {
+  // contentとentitiesの両方にデータが分散している可能性があるため結合
+  const allText = [ref.content, ...(ref.entities || [])].join('\n');
+
+  const extractStr = (key: string) => {
+    const match = allText.match(new RegExp(`'${key}'\\s*:\\s*'([^']+)'`));
+    return match ? match[1] : null;
+  };
+  const extractNum = (key: string) => {
+    const match = allText.match(new RegExp(`'${key}'\\s*:\\s*([0-9]+)`));
+    return match ? match[1] : null;
+  };
+
+  const disease = extractStr('disease_name');
+  const age = extractStr('age_display') || extractNum('age');
+  const gender = extractStr('gender');
+  const risks = extractStr('risks');
+  const comorbidities = extractStr('comorbidities');
+  const stg = extractStr('short_term_goal');
+  const ltg = extractStr('long_term_goal');
+
+  // 長すぎる辞書データを除外し、本当のタグ（短い文字列）だけを残す
+  const realTags = (ref.entities || []).filter((e: any) => typeof e === 'string' && e.length < 30);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {(disease || risks || stg || ltg) ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem', color: '#475569' }}>
+          {disease && <div><span style={{fontWeight: 'bold', color: '#334155'}}>疾患:</span> {disease} {age ? `(${age}${gender ? `・${gender}` : ''})` : ''}</div>}
+          {comorbidities && <div><span style={{fontWeight: 'bold', color: '#334155'}}>合併症:</span> {comorbidities}</div>}
+          {risks && <div><span style={{fontWeight: 'bold', color: '#334155'}}>リスク:</span> {risks}</div>}
+          {stg && <div><span style={{fontWeight: 'bold', color: '#334155'}}>短期目標:</span> {stg}</div>}
+          {ltg && <div><span style={{fontWeight: 'bold', color: '#334155'}}>長期目標:</span> {ltg}</div>}
+        </div>
+      ) : (
+        ref.content ? <p style={{ fontSize: '0.75rem', color: '#475569', margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ref.content}</p> : null
+      )}
+      
+      {realTags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          {realTags.map((e: string) => (
+            <span key={e} style={{ fontSize: '0.65rem', backgroundColor: 'white', color: '#64748b', padding: '2px 6px', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+              #{e}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==============================================================
 // 2. Components
 // ==============================================================
@@ -138,7 +190,8 @@ const LeftPanel: React.FC = () => {
     patientData, setPatientData, registerPatientName, 
     currentHashId, setCurrentHashId, patientList,
     fieldConfigs, updateFieldConfig, saveStructureToStorage,
-    selectedCellAddress
+    selectedCellAddress,
+    references
   } = usePlanContext();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -449,6 +502,35 @@ const LeftPanel: React.FC = () => {
              患者を選択すると詳細が表示されます。
            </div>
         )}
+
+        {/* RAG 参照エビデンス表示エリア */}
+        <div style={{ padding: '16px', borderTop: '4px solid #f1f5f9', background: 'white' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <BookOpen size={16} color="#4f46e5" /> 参照エビデンス (RAG)
+          </h3>
+          
+          {(!references || references.length === 0) ? (
+            <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+              生成時に使用された根拠がここに表示されます
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {references.map((ref) => (
+                <div key={ref.id} style={{ padding: '12px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1d4ed8' }}>類似症例: {ref.id}</span>
+                    <span style={{ fontSize: '0.7rem', backgroundColor: '#bfdbfe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 500 }}>
+                      適合度: {Math.round(ref.similarity * 100)}%
+                    </span>
+                  </div>
+                  
+                  {formatReference(ref)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
