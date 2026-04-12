@@ -8,12 +8,15 @@ Summary:
 Tags: Repository, Database, Patients, Hybrid Search, pgvector, CRUD
 """
 
+import json
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.infrastructure.db.models import PatientsView, DocumentsView
 from app.schemas.schemas import PatientCreate
+from app.adapters.embedding.factory import get_embedding_client
+from app.usecases.utils.context_builder import prepare_patient_facts
 
 class PatientRepository:
     """
@@ -27,6 +30,24 @@ class PatientRepository:
         患者を新規登録します。
         """
         print(f"[PatientRepository] Creating patient with hash_id: {patient.hash_id}")
+
+        # ベクトル(social_vector)の自動生成処理
+        vector_data = patient.social_vector
+        if not vector_data:
+            try:
+                print(f"[PatientRepository] Start generating embedding vector for {patient.hash_id}")
+                # Pydanticモデルからフラットな辞書を作成し、事実情報を構築
+                flat_data = patient.model_dump()
+                facts_dict = prepare_patient_facts(flat_data)
+                searchable_text = json.dumps(facts_dict, ensure_ascii=False)
+                
+                # Factoryを使って環境変数に応じたクライアントを取得し、ベクトルを生成
+                embedding_client = get_embedding_client()
+                vector_data = embedding_client.embed_text(searchable_text)
+                print(f"[PatientRepository] Successfully generated social_vector (dimension: {len(vector_data) if vector_data else 0})")
+            except Exception as e:
+                print(f"[PatientRepository] Vectorization failed for {patient.hash_id}: {e}")
+                vector_data = None
         
         # モデルインスタンスの作成
         db_patient = PatientsView(
@@ -40,7 +61,7 @@ class PatientRepository:
             outcome=patient.outcome,
             total_fim_admission=patient.total_fim_admission,
             mental_min=patient.mental_min,
-            social_vector=patient.social_vector
+            social_vector=vector_data
         )
         
         # DBに追加してコミット

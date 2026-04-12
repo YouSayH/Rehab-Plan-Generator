@@ -10,7 +10,7 @@ Tags: Schema, Pydantic, Data Extraction, ADL, Mapping, Conversion
 
 from datetime import date
 from typing import Optional, Literal, Dict, Any
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 # ==========================================
 # 1. Basic & Header Information
@@ -44,6 +44,17 @@ class BasicInfoSchema(BaseModel):
     treatment_details: Optional[str] = Field(None, description="治療内容")
     onset_date: Optional[date] = Field(None, description="発症日または手術日")
     rehab_start_date: Optional[date] = Field(None, description="リハビリテーション開始日")
+
+    @field_validator('evaluation_date', 'onset_date', 'rehab_start_date', mode='before')
+    @classmethod
+    def parse_frontend_date(cls, v):
+        """フロントエンド固有のオブジェクト形式から日付文字列を抽出する"""
+        if isinstance(v, dict):
+            raw_date = v.get('raw') or v.get('full')
+            if raw_date:
+                # "2026/04/12" のような形式を "2026-04-12" に変換
+                return str(raw_date).replace('/', '-')
+        return v
 
     # Therapy Types
     therapy_pt: Optional[bool] = Field(None, description="理学療法(PT)の実施有無")
@@ -521,6 +532,15 @@ class SignatureSchema(BaseModel):
     explained_to: Optional[str] = Field(None)
     explanation_date: Optional[date] = Field(None)
     explainer: Optional[str] = Field(None)
+
+    @field_validator('explanation_date', mode='before')
+    @classmethod
+    def parse_frontend_date(cls, v):
+        if isinstance(v, dict):
+            raw_date = v.get('raw') or v.get('full')
+            if raw_date:
+                return str(raw_date).replace('/', '-')
+        return v
 
 
 # ==========================================

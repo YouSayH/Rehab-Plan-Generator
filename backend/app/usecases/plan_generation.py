@@ -23,8 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import create_model, Field
 
 from app.adapters.llm.factory import get_llm_client
+from app.adapters.embedding.factory import get_embedding_client
 from app.core.constants import PATIENT_FIELD_LABELS
 from app.infrastructure.repositories.plan_repository import PlanRepository
+from app.infrastructure.repositories.rag_repository import RAGRepository
 from app.schemas.extraction_schemas import PatientExtractionSchema
 from app.schemas.legacy_schemas import GENERATION_GROUPS
 from app.schemas.schemas import PlanCreate
@@ -206,6 +208,51 @@ class PlanGenerationUseCase:
         facts_str = json.dumps(facts, ensure_ascii=False, indent=2)
         
         logger.debug(f"execute_custom: Formatted facts length: {len(facts_str)} chars")
+
+        # =========================================================================
+        # [RAG / 類似症例検索]
+        # その場でベクトルを生成し、過去の類似事例を検索してプロンプトに組み込む
+        # =========================================================================
+        similar_cases_str = ""
+        try:
+            logger.info("execute_custom: Generating vector for RAG similarity search...")
+            # 検索用テキストの作成（DB保存時と同じ形式に）
+            searchable_text = json.dumps(facts, ensure_ascii=False)
+            
+            # リアルタイムでベクトル生成 (Ruri または Gemini)
+            embedding_client = get_embedding_client()
+            target_vector = embedding_client.embed_text(searchable_text)
+            
+            # 類似症例の検索
+            rag_repo = RAGRepository(self.db)
+            
+            # 同一疾患の患者に絞るためのフィルタ
+            filters = {}
+            if "diagnosis_code" in flat_data and flat_data["diagnosis_code"]:
+                 filters["diagnosis"] = str(flat_data["diagnosis_code"])
+            
+            # 自身(現在編集中の患者)の除外用ID（取得できれば）
+            current_hash_id = validated_data.basic.name if validated_data.basic else None
+                 
+            # ベクトル検索の実行
+            similar_docs = await rag_repo.search_similar_documents(
+                query_vector=target_vector,
+                filters=filters,
+                exclude_hash_id=current_hash_id,
+                limit=2
+            )
+            
+            if similar_docs:
+                similar_docs_json = json.dumps(similar_docs, ensure_ascii=False, indent=2)
+                similar_cases_str = f"\n【参考情報 (過去の類似事例)】\n以下の過去事例を参考に、今回の患者様に適した内容を生成してください。\n```json\n{similar_docs_json}\n```\n"
+                logger.info(f"execute_custom: Found {len(similar_docs)} similar cases.")
+            else:
+                logger.info("execute_custom: No similar cases found.")
+                
+        except Exception as e:
+            logger.error(f"execute_custom: Error during RAG similarity search: {e}", exc_info=True)
+            # 検索に失敗しても生成自体は続行する
+        # =========================================================================
         
         # 既存計画のコンテキスト化
         plan_context_str = ""
@@ -220,12 +267,13 @@ class PlanGenerationUseCase:
 【患者データ】
 {facts_str}
 {plan_context_str}
+{similar_cases_str}
 【指示】
 {prompt}
 
 出力は指示された内容のみをテキストで返してください。余計な挨拶は不要です。
 """
-        logger.info(f"Executing Custom Generation Prompt: {prompt[:50]}...")
+        logger.info(f"Executing Custom Generation Prompt with RAG: {prompt[:50]}...")
         
         # テキスト生成としてLLMを呼び出し
         response_text = await self.llm_client.generate_text(full_prompt)

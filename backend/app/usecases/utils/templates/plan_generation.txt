@@ -15,6 +15,7 @@ ${patient_facts}
 
   ```json
 ${generated_plan}
+${similar_cases_context}
   ```
 
 # 重要な参照基準
